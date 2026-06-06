@@ -1,0 +1,66 @@
+import React, { useState } from 'react';
+import { HomeScreen } from './src/screens/HomeScreen';
+import { ProfileScreen } from './src/screens/ProfileScreen';
+import { MainTabScreen } from './src/screens/MainTabScreen';
+import { AuthScreen } from './src/screens/AuthScreen';
+import { supabase } from './src/lib/supabase';
+
+type Screen = 'home' | 'auth' | 'profile' | 'main';
+
+export type User = {
+  id: string;
+  name: string;
+  age: number;
+  gender: string;
+  prefecture: string;
+  profile: string;
+  photoUrl: string | null;
+  photoUrls: string[];
+  hobbies: string[];
+  holiday: string;
+  job: string;
+};
+
+export default function App() {
+  const [screen, setScreen] = useState<Screen>('home');
+
+  const goAfterLogin = async () => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      setScreen('auth');
+      return;
+    }
+
+    const { data } = await supabase
+      .from('profiles')
+      .select('id, is_banned')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    if (data?.is_banned) {
+      alert('このアカウントは利用停止中です。');
+      await supabase.auth.signOut();
+      setScreen('home');
+      return;
+    }
+
+    setScreen(data ? 'main' : 'profile');
+  };
+
+  if (screen === 'auth') {
+    return <AuthScreen onComplete={goAfterLogin} />;
+  }
+
+  if (screen === 'profile') {
+    return <ProfileScreen onComplete={() => setScreen('main')} />;
+  }
+
+  if (screen === 'main') {
+    return <MainTabScreen onLogout={() => setScreen('home')} />;
+  }
+
+  return <HomeScreen onStart={() => setScreen('auth')} />;
+}
