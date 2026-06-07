@@ -289,7 +289,12 @@ export function EditProfileScreen({ onBack, onSaved }: Props) {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.formContainer}>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={styles.formCard}>
         <TouchableOpacity onPress={onBack}>
           <Text style={styles.backText}>← 戻る</Text>
         </TouchableOpacity>
@@ -424,6 +429,7 @@ export function EditProfileScreen({ onBack, onSaved }: Props) {
             {isSaving ? '保存中...' : '保存する'}
           </Text>
         </TouchableOpacity>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -445,12 +451,22 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
     width: '100%',
-    maxWidth: 560,
-    alignSelf: 'center',
   },
-  formContainer: {
-    padding: 22,
-    paddingBottom: 50,
+  scrollView: {
+    flex: 1,
+    width: '100%',
+  },
+  scrollContent: {
+    flexGrow: 1,
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingTop: 18,
+    paddingBottom: 56,
+  },
+  formCard: {
+    width: '100%',
+    maxWidth: 520,
+    alignSelf: 'center',
   },
   backText: {
     color: colors.primary,
