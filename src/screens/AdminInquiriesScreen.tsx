@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
+  Alert,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -45,7 +46,7 @@ export function AdminInquiriesScreen() {
     setIsLoading(false);
 
     if (error) {
-      alert(error.message);
+      Alert.alert('エラー', error.message);
       return;
     }
 
@@ -53,28 +54,37 @@ export function AdminInquiriesScreen() {
   };
 
   const closeInquiry = async (id: number) => {
-    const confirmed = confirm('このお問い合わせを対応済みにしますか？');
-    if (!confirmed) return;
+    Alert.alert(
+      '確認',
+      'このお問い合わせを対応済みにしますか？',
+      [
+        { text: 'キャンセル', style: 'cancel' },
+        {
+          text: '対応済みにする',
+          onPress: async () => {
+            const {
+              data: { user },
+            } = await supabase.auth.getUser();
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+            const { error } = await supabase
+              .from('inquiries')
+              .update({
+                status: 'closed',
+                handled_at: new Date().toISOString(),
+                handled_by: user?.id || null,
+              })
+              .eq('id', id);
 
-    const { error } = await supabase
-      .from('inquiries')
-      .update({
-        status: 'closed',
-        handled_at: new Date().toISOString(),
-        handled_by: user?.id || null,
-      })
-      .eq('id', id);
+            if (error) {
+              Alert.alert('エラー', error.message);
+              return;
+            }
 
-    if (error) {
-      alert(error.message);
-      return;
-    }
-
-    loadInquiries();
+            loadInquiries();
+          },
+        },
+      ]
+    );
   };
 
   const reopenInquiry = async (id: number) => {
@@ -88,7 +98,7 @@ export function AdminInquiriesScreen() {
       .eq('id', id);
 
     if (error) {
-      alert(error.message);
+      Alert.alert('エラー', error.message);
       return;
     }
 
@@ -124,6 +134,7 @@ export function AdminInquiriesScreen() {
                   {item.status === 'closed' ? '対応済み' : '未対応'}
                 </Text>
               </View>
+
               <Text style={styles.meta}>日時：{new Date(item.created_at).toLocaleString()}</Text>
               <Text style={styles.meta}>ユーザー：{item.email || item.user_id}</Text>
               <Text style={styles.message}>{item.message}</Text>

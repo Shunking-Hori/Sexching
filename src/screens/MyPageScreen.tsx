@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
+  Alert,
   SafeAreaView,
   StyleSheet,
   Text,
@@ -61,20 +62,8 @@ export function MyPageScreen({ onLogout, onEdit, onOpenLegal, onOpenInquiry }: P
     onLogout();
   };
 
-  const handleDeleteAccount = async () => {
+  const executeDeleteAccount = async () => {
     if (isDeleting) return;
-
-    const firstConfirm = confirm(
-      'アカウントを削除しますか？プロフィール、いいね、マッチ、メッセージ等のデータが削除されます。'
-    );
-
-    if (!firstConfirm) return;
-
-    const secondConfirm = confirm(
-      'この操作は取り消せません。本当に削除しますか？'
-    );
-
-    if (!secondConfirm) return;
 
     setIsDeleting(true);
 
@@ -83,13 +72,17 @@ export function MyPageScreen({ onLogout, onEdit, onOpenLegal, onOpenInquiry }: P
     } = await supabase.auth.getUser();
 
     if (!user) {
-      alert('ログイン情報を取得できませんでした。');
+      Alert.alert('エラー', 'ログイン情報を取得できませんでした。');
       setIsDeleting(false);
       return;
     }
 
     try {
-      await supabase.rpc('delete_current_user');
+      const { error } = await supabase.rpc('delete_current_user');
+
+      if (error) {
+        throw error;
+      }
     } catch {
       await supabase.from('withdrawal_requests').insert({
         user_id: user.id,
@@ -103,6 +96,35 @@ export function MyPageScreen({ onLogout, onEdit, onOpenLegal, onOpenInquiry }: P
     onLogout();
   };
 
+  const handleDeleteAccount = async () => {
+    if (isDeleting) return;
+
+    Alert.alert(
+      'アカウントを削除しますか？',
+      'プロフィール、いいね、マッチ、メッセージ等のデータが削除されます。',
+      [
+        { text: 'キャンセル', style: 'cancel' },
+        {
+          text: '削除する',
+          style: 'destructive',
+          onPress: () => {
+            Alert.alert(
+              '最終確認',
+              'この操作は取り消せません。本当に削除しますか？',
+              [
+                { text: 'キャンセル', style: 'cancel' },
+                {
+                  text: '完全に削除する',
+                  style: 'destructive',
+                  onPress: executeDeleteAccount,
+                },
+              ]
+            );
+          },
+        },
+      ]
+    );
+  };
 
   const calculateAge = () => {
     if (!myProfile?.birth_year || !myProfile.birth_month || !myProfile.birth_day) {
@@ -150,7 +172,9 @@ export function MyPageScreen({ onLogout, onEdit, onOpenLegal, onOpenInquiry }: P
 
           <Text style={styles.basicInfo}>
             {myProfile
-              ? `${myProfile.gender || '性別未設定'} / ${calculateAge()}歳 / ${myProfile.prefecture || '居住地未設定'}`
+              ? `${myProfile.gender || '性別未設定'} / ${calculateAge()}歳 / ${
+                  myProfile.prefecture || '居住地未設定'
+                }`
               : 'プロフィール未登録'}
           </Text>
 
@@ -167,26 +191,17 @@ export function MyPageScreen({ onLogout, onEdit, onOpenLegal, onOpenInquiry }: P
         </View>
 
         <View style={styles.menuCard}>
-          <TouchableOpacity
-            style={styles.menuItem}
-            onPress={() => onOpenLegal('terms')}
-          >
+          <TouchableOpacity style={styles.menuItem} onPress={() => onOpenLegal('terms')}>
             <Text style={styles.menuText}>利用規約</Text>
             <Text style={styles.menuArrow}>›</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.menuItem}
-            onPress={() => onOpenLegal('privacy')}
-          >
+          <TouchableOpacity style={styles.menuItem} onPress={() => onOpenLegal('privacy')}>
             <Text style={styles.menuText}>プライバシーポリシー</Text>
             <Text style={styles.menuArrow}>›</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.menuItem}
-            onPress={onOpenInquiry}
-          >
+          <TouchableOpacity style={styles.menuItem} onPress={onOpenInquiry}>
             <Text style={styles.menuText}>お問い合わせ</Text>
             <Text style={styles.menuArrow}>›</Text>
           </TouchableOpacity>
