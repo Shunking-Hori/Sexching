@@ -9,10 +9,11 @@ import {
 import { StatusBar } from 'expo-status-bar';
 
 type Props = {
-  onStart: () => void;
+  onLogin: () => void;
+  onSignup: () => void;
 };
 
-export function HomeScreen({ onStart }: Props) {
+export function HomeScreen({ onLogin, onSignup }: Props) {
   return (
     <SafeAreaView style={styles.homeContainer}>
       <View style={styles.heroCard}>
@@ -26,11 +27,11 @@ export function HomeScreen({ onStart }: Props) {
           気取らず、でも心地よく
         </Text>
 
-        <TouchableOpacity style={styles.primaryButton} onPress={onStart}>
-          <Text style={styles.primaryButtonText}>はじめる</Text>
+        <TouchableOpacity style={styles.primaryButton} onPress={onSignup}>
+          <Text style={styles.primaryButtonText}>新規登録</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.secondaryButton} onPress={onStart}>
+        <TouchableOpacity style={styles.secondaryButton} onPress={onLogin}>
           <Text style={styles.secondaryButtonText}>ログイン</Text>
         </TouchableOpacity>
       </View>

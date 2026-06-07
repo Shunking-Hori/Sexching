@@ -7,6 +7,7 @@ import { LegalScreen } from './src/screens/LegalScreen';
 import { supabase } from './src/lib/supabase';
 
 type Screen = 'home' | 'auth' | 'profile' | 'main';
+type AuthInitialMode = 'login' | 'signup';
 type LegalType = 'terms' | 'privacy' | 'contact';
 
 export type User = {
@@ -21,11 +22,13 @@ export type User = {
   hobbies: string[];
   holiday: string;
   job: string;
+  bustSize?: string;
 };
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>('home');
   const [authLegalType, setAuthLegalType] = useState<LegalType | null>(null);
+  const [authInitialMode, setAuthInitialMode] = useState<AuthInitialMode>('login');
 
   const goAfterLogin = async () => {
     const {
@@ -60,6 +63,7 @@ export default function App() {
   if (screen === 'auth') {
     return (
       <AuthScreen
+        initialMode={authInitialMode}
         onComplete={goAfterLogin}
         onOpenLegal={setAuthLegalType}
       />
@@ -74,5 +78,16 @@ export default function App() {
     return <MainTabScreen onLogout={() => setScreen('home')} />;
   }
 
-  return <HomeScreen onStart={() => setScreen('auth')} />;
+  return (
+    <HomeScreen
+      onLogin={() => {
+        setAuthInitialMode('login');
+        setScreen('auth');
+      }}
+      onSignup={() => {
+        setAuthInitialMode('signup');
+        setScreen('auth');
+      }}
+    />
+  );
 }

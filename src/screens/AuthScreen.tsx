@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   SafeAreaView,
   ScrollView,
@@ -14,29 +14,37 @@ import { supabase } from '../lib/supabase';
 type LegalType = 'terms' | 'privacy' | 'contact';
 
 type Props = {
+  initialMode?: 'login' | 'signup';
   onComplete: () => void;
   onOpenLegal: (type: LegalType) => void;
 };
 
-type AuthMode = 'login' | 'signup';
+type AuthMode = 'login' | 'signup' | 'reset';
 
-export function AuthScreen({ onComplete, onOpenLegal }: Props) {
-  const [mode, setMode] = useState<AuthMode>('login');
+export function AuthScreen({ initialMode = 'login', onComplete, onOpenLegal }: Props) {
+  const [mode, setMode] = useState<AuthMode>(initialMode);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [isOver18, setIsOver18] = useState(false);
   const [agreedLegal, setAgreedLegal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [infoMessage, setInfoMessage] = useState('');
+
+  useEffect(() => {
+    setMode(initialMode);
+    resetExtraInputs();
+  }, [initialMode]);
 
   const isSignup = mode === 'signup';
+  const isReset = mode === 'reset';
   const isEmailValid = email.trim().includes('@');
   const isPasswordValid = password.length >= 6;
   const isPasswordMatched = !isSignup || password === passwordConfirm;
 
   const canSubmit =
     isEmailValid &&
-    isPasswordValid &&
+    (isReset || isPasswordValid) &&
     isPasswordMatched &&
     (!isSignup || (isOver18 && agreedLegal)) &&
     !isSubmitting;
@@ -45,6 +53,7 @@ export function AuthScreen({ onComplete, onOpenLegal }: Props) {
     setPasswordConfirm('');
     setIsOver18(false);
     setAgreedLegal(false);
+    setInfoMessage('');
   };
 
   const switchMode = (nextMode: AuthMode) => {
@@ -55,8 +64,9 @@ export function AuthScreen({ onComplete, onOpenLegal }: Props) {
   const handleLogin = async () => {
     if (!canSubmit) return;
 
+    setInfoMessage('');
     setIsSubmitting(true);
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email: email.trim(),
       password,
     });
@@ -67,12 +77,19 @@ export function AuthScreen({ onComplete, onOpenLegal }: Props) {
       return;
     }
 
+    if (!data.user?.email_confirmed_at) {
+      await supabase.auth.signOut();
+      alert('メール認証が完了していません。登録時に届いた確認メールから認証を完了してください。');
+      return;
+    }
+
     onComplete();
   };
 
   const handleSignup = async () => {
     if (!canSubmit) return;
 
+    setInfoMessage('');
     setIsSubmitting(true);
     const { error } = await supabase.auth.signUp({
       email: email.trim(),
@@ -92,16 +109,60 @@ export function AuthScreen({ onComplete, onOpenLegal }: Props) {
       return;
     }
 
-    onComplete();
+    setPassword('');
+    setPasswordConfirm('');
+    setMode('login');
+    setInfoMessage('確認メールを送信しました。メール内のリンクを開いて認証後、ログインしてください。');
+  };
+
+  const handleResetPassword = async () => {
+    if (!canSubmit) return;
+
+    setInfoMessage('');
+    setIsSubmitting(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim());
+    setIsSubmitting(false);
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    setMode('login');
+    setPassword('');
+    setInfoMessage('パスワード再設定メールを送信しました。メール内のリンクから再設定してください。');
   };
 
   const handleSubmit = () => {
+    if (isReset) {
+      handleResetPassword();
+      return;
+    }
+
     if (isSignup) {
       handleSignup();
       return;
     }
 
     handleLogin();
+  };
+
+  const getTitle = () => {
+    if (isReset) return 'パスワード再設定';
+    return isSignup ? '新規登録' : 'ログイン';
+  };
+
+  const getSubtitle = () => {
+    if (isReset) return '登録メールアドレスを入力すると、再設定用メールを送信します。';
+    return isSignup
+      ? 'メールアドレスで登録し、メール認証後にプロフィール作成へ進みます。'
+      : '登録済みのメールアドレスでログインしてください。';
+  };
+
+  const getButtonText = () => {
+    if (isSubmitting) return '処理中...';
+    if (isReset) return '再設定メールを送信';
+    return isSignup ? '登録する' : 'ログインする';
   };
 
   return (
@@ -113,27 +174,27 @@ export function AuthScreen({ onComplete, onOpenLegal }: Props) {
       >
         <View style={styles.card}>
           <Text style={styles.logo}>Xching</Text>
-          <Text style={styles.title}>{isSignup ? '新規登録' : 'ログイン'}</Text>
-          <Text style={styles.subtitle}>
-            {isSignup
-              ? 'メールアドレスで登録し、プロフィール作成へ進みます。'
-              : '登録済みのメールアドレスでログインしてください。'}
-          </Text>
+          <Text style={styles.title}>{getTitle()}</Text>
+          <Text style={styles.subtitle}>{getSubtitle()}</Text>
 
-          <View style={styles.modeRow}>
-            <TouchableOpacity
-              style={[styles.modeButton, !isSignup && styles.modeButtonActive]}
-              onPress={() => switchMode('login')}
-            >
-              <Text style={[styles.modeText, !isSignup && styles.modeTextActive]}>ログイン</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.modeButton, isSignup && styles.modeButtonActive]}
-              onPress={() => switchMode('signup')}
-            >
-              <Text style={[styles.modeText, isSignup && styles.modeTextActive]}>新規登録</Text>
-            </TouchableOpacity>
-          </View>
+          {!isReset && (
+            <View style={styles.modeRow}>
+              <TouchableOpacity
+                style={[styles.modeButton, !isSignup && styles.modeButtonActive]}
+                onPress={() => switchMode('login')}
+              >
+                <Text style={[styles.modeText, !isSignup && styles.modeTextActive]}>ログイン</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modeButton, isSignup && styles.modeButtonActive]}
+                onPress={() => switchMode('signup')}
+              >
+                <Text style={[styles.modeText, isSignup && styles.modeTextActive]}>新規登録</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {infoMessage.length > 0 && <Text style={styles.infoText}>{infoMessage}</Text>}
 
           <Text style={styles.label}>メールアドレス</Text>
           <TextInput
@@ -145,14 +206,18 @@ export function AuthScreen({ onComplete, onOpenLegal }: Props) {
             keyboardType="email-address"
           />
 
-          <Text style={styles.label}>パスワード</Text>
-          <TextInput
-            style={styles.input}
-            value={password}
-            onChangeText={setPassword}
-            placeholder="6文字以上"
-            secureTextEntry
-          />
+          {!isReset && (
+            <>
+              <Text style={styles.label}>パスワード</Text>
+              <TextInput
+                style={styles.input}
+                value={password}
+                onChangeText={setPassword}
+                placeholder="6文字以上"
+                secureTextEntry
+              />
+            </>
+          )}
 
           {isSignup && (
             <>
@@ -205,18 +270,24 @@ export function AuthScreen({ onComplete, onOpenLegal }: Props) {
             onPress={handleSubmit}
             disabled={!canSubmit}
           >
-            <Text style={styles.primaryButtonText}>
-              {isSubmitting
-                ? '処理中...'
-                : isSignup
-                  ? '登録してプロフィール作成へ'
-                  : 'ログインする'}
-            </Text>
+            <Text style={styles.primaryButtonText}>{getButtonText()}</Text>
           </TouchableOpacity>
+
+          {!isSignup && !isReset && (
+            <TouchableOpacity style={styles.textButton} onPress={() => switchMode('reset')}>
+              <Text style={styles.textButtonText}>パスワードを忘れた方はこちら</Text>
+            </TouchableOpacity>
+          )}
+
+          {isReset && (
+            <TouchableOpacity style={styles.textButton} onPress={() => switchMode('login')}>
+              <Text style={styles.textButtonText}>ログイン画面に戻る</Text>
+            </TouchableOpacity>
+          )}
 
           {isSignup && (
             <Text style={styles.note}>
-              登録後、プロフィール登録画面で生年月日を入力します。18歳未満の方は本サービスを利用できません。
+              登録後、確認メールを送信します。メール認証後、プロフィール登録画面で生年月日を入力します。18歳未満の方は本サービスを利用できません。
             </Text>
           )}
         </View>
@@ -235,6 +306,7 @@ const colors = {
   subText: '#75666c',
   border: '#ead9de',
   error: '#b3261e',
+  successBg: '#f4edf0',
 };
 
 const styles = StyleSheet.create({
@@ -302,6 +374,19 @@ const styles = StyleSheet.create({
   },
   modeTextActive: {
     color: '#fff',
+  },
+  infoText: {
+    backgroundColor: colors.successBg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    color: colors.primary,
+    fontSize: 13,
+    fontWeight: '800',
+    lineHeight: 20,
+    marginBottom: 8,
   },
   label: {
     fontSize: 14,
@@ -381,6 +466,16 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 17,
     fontWeight: '800',
+  },
+  textButton: {
+    alignItems: 'center',
+    paddingVertical: 14,
+  },
+  textButtonText: {
+    color: colors.primary,
+    fontSize: 14,
+    fontWeight: '800',
+    textDecorationLine: 'underline',
   },
   errorText: {
     color: colors.error,

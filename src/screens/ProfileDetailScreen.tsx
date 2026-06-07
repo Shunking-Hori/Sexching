@@ -260,6 +260,13 @@ export function ProfileDetailScreen({ user, onBack }: Props) {
           <Text style={styles.bodyText}>{user.job}</Text>
         </View>
 
+        {user.gender === '女性' && user.bustSize && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>バストサイズ</Text>
+            <Text style={styles.bodyText}>{user.bustSize}</Text>
+          </View>
+        )}
+
         <TouchableOpacity
           style={[styles.likeButton, isLiked && styles.likeButtonLiked]}
           onPress={sendLike}

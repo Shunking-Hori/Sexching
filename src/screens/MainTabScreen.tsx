@@ -12,13 +12,16 @@ import { MatchesScreen } from './MatchesScreen';
 import { MyPageScreen } from './MyPageScreen';
 import { ProfileDetailScreen } from './ProfileDetailScreen';
 import { AdminLikesScreen } from './AdminLikesScreen';
+import { AdminInquiriesScreen } from './AdminInquiriesScreen';
 import { EditProfileScreen } from './EditProfileScreen';
 import { ChatScreen } from './ChatScreen';
+import { LegalScreen } from './LegalScreen';
+import { InquiryScreen } from './InquiryScreen';
 import type { User } from '../../App';
 import { supabase } from '../lib/supabase';
-import { LegalScreen } from './LegalScreen';
 
 type Tab = 'home' | 'likes' | 'matches' | 'mypage' | 'admin';
+type AdminMode = 'likes' | 'inquiries';
 
 type Props = {
   onLogout: () => void;
@@ -26,11 +29,12 @@ type Props = {
 
 export function MainTabScreen({ onLogout }: Props) {
   const [activeTab, setActiveTab] = useState<Tab>('home');
+  const [adminMode, setAdminMode] = useState<AdminMode>('likes');
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [isOpeningInquiry, setIsOpeningInquiry] = useState(false);
   const [matchesRefreshKey, setMatchesRefreshKey] = useState(0);
-  const [matchListRefreshKey, setMatchListRefreshKey] = useState(0);
   const [legalType, setLegalType] = useState<'terms' | 'privacy' | 'contact' | null>(null);
   const [chatPartner, setChatPartner] = useState<{
     id: string;
@@ -70,12 +74,7 @@ export function MainTabScreen({ onLogout }: Props) {
     return (
       <ProfileDetailScreen
         user={selectedUser}
-        onBack={(refresh) => {
-          setSelectedUser(null);
-          if (refresh) {
-            setMatchListRefreshKey((current) => current + 1);
-          }
-        }}
+        onBack={() => setSelectedUser(null)}
       />
     );
   }
@@ -89,15 +88,19 @@ export function MainTabScreen({ onLogout }: Props) {
     );
   }
 
+  if (isOpeningInquiry) {
+    return <InquiryScreen onBack={() => setIsOpeningInquiry(false)} />;
+  }
 
   if (legalType) {
-  return (
-    <LegalScreen
-      type={legalType}
-      onBack={() => setLegalType(null)}
-    />
-  );
-}
+    return (
+      <LegalScreen
+        type={legalType}
+        onBack={() => setLegalType(null)}
+      />
+    );
+  }
+
   if (chatPartner) {
     return (
       <ChatScreen
@@ -107,6 +110,32 @@ export function MainTabScreen({ onLogout }: Props) {
       />
     );
   }
+
+  const renderAdminScreen = () => (
+    <View style={styles.adminWrapper}>
+      <View style={styles.adminSwitchRow}>
+        <TouchableOpacity
+          style={[styles.adminSwitchButton, adminMode === 'likes' && styles.adminSwitchButtonActive]}
+          onPress={() => setAdminMode('likes')}
+        >
+          <Text style={[styles.adminSwitchText, adminMode === 'likes' && styles.adminSwitchTextActive]}>
+            いいね承認
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.adminSwitchButton, adminMode === 'inquiries' && styles.adminSwitchButtonActive]}
+          onPress={() => setAdminMode('inquiries')}
+        >
+          <Text style={[styles.adminSwitchText, adminMode === 'inquiries' && styles.adminSwitchTextActive]}>
+            お問い合わせ
+          </Text>
+        </TouchableOpacity>
+      </View>
+      <View style={styles.adminContent}>
+        {adminMode === 'likes' ? <AdminLikesScreen /> : <AdminInquiriesScreen />}
+      </View>
+    </View>
+  );
 
   const renderScreen = () => {
     if (activeTab === 'likes') return <LikesScreen />;
@@ -122,7 +151,7 @@ export function MainTabScreen({ onLogout }: Props) {
       );
     }
 
-    if (activeTab === 'admin') return <AdminLikesScreen />;
+    if (activeTab === 'admin') return renderAdminScreen();
 
     if (activeTab === 'mypage') {
       return (
@@ -130,16 +159,12 @@ export function MainTabScreen({ onLogout }: Props) {
           onLogout={onLogout}
           onEdit={() => setIsEditingProfile(true)}
           onOpenLegal={setLegalType}
+          onOpenInquiry={() => setIsOpeningInquiry(true)}
         />
       );
     }
 
-    return (
-      <MatchListScreen
-        key={matchListRefreshKey}
-        onSelectUser={setSelectedUser}
-      />
-    );
+    return <MatchListScreen onSelectUser={setSelectedUser} />;
   };
 
   return (
@@ -223,16 +248,48 @@ const styles = StyleSheet.create({
   },
   screenArea: {
     flex: 1,
+  },
+  adminWrapper: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  adminSwitchRow: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 8,
     width: '100%',
-    maxWidth: 560,
+    maxWidth: 680,
     alignSelf: 'center',
+  },
+  adminSwitchButton: {
+    flex: 1,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.card,
+    alignItems: 'center',
+    paddingVertical: 12,
+  },
+  adminSwitchButtonActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  adminSwitchText: {
+    color: colors.subText,
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  adminSwitchTextActive: {
+    color: '#fff',
+  },
+  adminContent: {
+    flex: 1,
   },
   tabBar: {
     height: 74,
     backgroundColor: colors.card,
-    width: '100%',
-    maxWidth: 560,
-    alignSelf: 'center',
     borderTopWidth: 1,
     borderTopColor: colors.border,
     flexDirection: 'row',

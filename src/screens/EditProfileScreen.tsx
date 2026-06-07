@@ -18,7 +18,9 @@ type Props = {
   onSaved: () => void;
 };
 
-type DropdownType = 'year' | 'month' | 'day' | 'prefecture' | null;
+type DropdownType = 'prefecture' | 'bustSize' | null;
+
+const BUST_SIZE_OPTIONS = ['未設定', 'A', 'B', 'C', 'D', 'E', 'F', 'G以上'];
 
 export function EditProfileScreen({ onBack, onSaved }: Props) {
   const [nickname, setNickname] = useState('');
@@ -31,6 +33,7 @@ export function EditProfileScreen({ onBack, onSaved }: Props) {
   const [hobbies, setHobbies] = useState('');
   const [holiday, setHoliday] = useState('');
   const [job, setJob] = useState('');
+  const [bustSize, setBustSize] = useState('');
   const [photoUrls, setPhotoUrls] = useState<string[]>([]);
   const [openDropdown, setOpenDropdown] = useState<DropdownType>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -117,6 +120,7 @@ export function EditProfileScreen({ onBack, onSaved }: Props) {
     setHobbies(data.hobbies || '');
     setHoliday(data.holiday || '');
     setJob(data.job || '');
+    setBustSize(data.bust_size || '');
     setPhotoUrls(existingPhotos);
   };
 
@@ -188,18 +192,6 @@ export function EditProfileScreen({ onBack, onSaved }: Props) {
   };
 
   const saveProfile = async () => {
-    const age = calculateAge();
-
-    if (age === null) {
-      alert('生年月日を入力してください。');
-      return;
-    }
-
-    if (age < 18) {
-      alert('18歳未満の方は利用できません。');
-      return;
-    }
-
     setIsSaving(true);
 
     const {
@@ -215,16 +207,13 @@ export function EditProfileScreen({ onBack, onSaved }: Props) {
     const { error } = await supabase
       .from('profiles')
       .update({
-        nickname,
-        gender,
-        birth_year: birthYear ? Number(birthYear) : null,
-        birth_month: birthMonth ? Number(birthMonth) : null,
-        birth_day: birthDay ? Number(birthDay) : null,
+        nickname: nickname.trim(),
         prefecture,
-        profile,
-        hobbies,
-        holiday,
-        job,
+        profile: profile.trim(),
+        hobbies: hobbies.trim(),
+        holiday: holiday.trim(),
+        job: job.trim(),
+        bust_size: gender === '女性' && bustSize !== '未設定' ? bustSize : null,
         photo_url: photoUrls[0] || null,
         photo_urls: photoUrls,
       })
@@ -343,38 +332,35 @@ export function EditProfileScreen({ onBack, onSaved }: Props) {
         />
 
         <Text style={styles.label}>性別</Text>
-        <View style={styles.choiceRow}>
-          {['男性', '女性'].map((item) => (
-            <TouchableOpacity
-              key={item}
-              style={[
-                styles.choiceButton,
-                gender === item && styles.choiceButtonActive,
-              ]}
-              onPress={() => setGender(item)}
-            >
-              <Text
-                style={[
-                  styles.choiceText,
-                  gender === item && styles.choiceTextActive,
-                ]}
-              >
-                {item}
-              </Text>
-            </TouchableOpacity>
-          ))}
+        <View style={styles.readOnlyBox}>
+          <Text style={styles.readOnlyText}>{gender || '未設定'}</Text>
         </View>
 
         <Text style={styles.label}>生年月日</Text>
-        <View style={styles.birthdayRow}>
-          {renderDropdown('year', '年', birthYear, years, setBirthYear, '年')}
-          {renderDropdown('month', '月', birthMonth, months, setBirthMonth, '月')}
-          {renderDropdown('day', '日', birthDay, days, setBirthDay, '日')}
+        <View style={styles.readOnlyBox}>
+          <Text style={styles.readOnlyText}>
+            {birthYear && birthMonth && birthDay
+              ? `${birthYear}年${birthMonth}月${birthDay}日`
+              : '未設定'}
+          </Text>
         </View>
 
         <Text style={styles.noticeText}>
-          ※18歳未満の方は利用できません
+          ※性別・生年月日は登録後に変更できません。
         </Text>
+
+        {gender === '女性' && (
+          <>
+            <Text style={styles.label}>バストサイズ</Text>
+            {renderDropdown(
+              'bustSize',
+              bustSize,
+              'バストサイズを選択',
+              BUST_SIZE_OPTIONS,
+              setBustSize
+            )}
+          </>
+        )}
 
         <Text style={styles.label}>居住地</Text>
         {renderDropdown(
@@ -561,6 +547,19 @@ const styles = StyleSheet.create({
     color: colors.subText,
     fontSize: 12,
     marginTop: 8,
+  },
+  readOnlyBox: {
+    backgroundColor: '#f4edf0',
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  readOnlyText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.subText,
   },
   input: {
     backgroundColor: colors.card,

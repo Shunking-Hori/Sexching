@@ -14,6 +14,7 @@ type Props = {
   onLogout: () => void;
   onEdit: () => void;
   onOpenLegal: (type: 'terms' | 'privacy' | 'contact') => void;
+  onOpenInquiry: () => void;
 };
 
 type MyProfile = {
@@ -31,7 +32,7 @@ type MyProfile = {
   job: string | null;
 };
 
-export function MyPageScreen({ onLogout, onEdit, onOpenLegal }: Props) {
+export function MyPageScreen({ onLogout, onEdit, onOpenLegal, onOpenInquiry }: Props) {
   const [myProfile, setMyProfile] = useState<MyProfile | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -184,7 +185,7 @@ export function MyPageScreen({ onLogout, onEdit, onOpenLegal }: Props) {
 
           <TouchableOpacity
             style={styles.menuItem}
-            onPress={() => onOpenLegal('contact')}
+            onPress={onOpenInquiry}
           >
             <Text style={styles.menuText}>お問い合わせ</Text>
             <Text style={styles.menuArrow}>›</Text>

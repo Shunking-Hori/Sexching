@@ -32,6 +32,7 @@ type ProfileRow = {
   hobbies: string | null;
   holiday: string | null;
   job: string | null;
+  bust_size: string | null;
 };
 
 const DAILY_LIKE_LIMIT = 10;
@@ -106,6 +107,7 @@ export function MatchListScreen({ onSelectUser }: Props) {
       hobbies: profile.hobbies ? profile.hobbies.split(',') : [],
       holiday: profile.holiday || '未設定',
       job: profile.job || '未設定',
+      bustSize: profile.bust_size || undefined,
     };
   };
 
