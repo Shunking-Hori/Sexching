@@ -3,9 +3,11 @@ import { HomeScreen } from './src/screens/HomeScreen';
 import { ProfileScreen } from './src/screens/ProfileScreen';
 import { MainTabScreen } from './src/screens/MainTabScreen';
 import { AuthScreen } from './src/screens/AuthScreen';
+import { LegalScreen } from './src/screens/LegalScreen';
 import { supabase } from './src/lib/supabase';
 
 type Screen = 'home' | 'auth' | 'profile' | 'main';
+type LegalType = 'terms' | 'privacy' | 'contact';
 
 export type User = {
   id: string;
@@ -23,6 +25,7 @@ export type User = {
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>('home');
+  const [authLegalType, setAuthLegalType] = useState<LegalType | null>(null);
 
   const goAfterLogin = async () => {
     const {
@@ -50,8 +53,17 @@ export default function App() {
     setScreen(data ? 'main' : 'profile');
   };
 
+  if (authLegalType) {
+    return <LegalScreen type={authLegalType} onBack={() => setAuthLegalType(null)} />;
+  }
+
   if (screen === 'auth') {
-    return <AuthScreen onComplete={goAfterLogin} />;
+    return (
+      <AuthScreen
+        onComplete={goAfterLogin}
+        onOpenLegal={setAuthLegalType}
+      />
+    );
   }
 
   if (screen === 'profile') {

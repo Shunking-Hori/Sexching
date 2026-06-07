@@ -33,6 +33,7 @@ type MyProfile = {
 
 export function MyPageScreen({ onLogout, onEdit, onOpenLegal }: Props) {
   const [myProfile, setMyProfile] = useState<MyProfile | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     loadProfile();
@@ -58,6 +59,50 @@ export function MyPageScreen({ onLogout, onEdit, onOpenLegal }: Props) {
     await supabase.auth.signOut();
     onLogout();
   };
+
+  const handleDeleteAccount = async () => {
+    if (isDeleting) return;
+
+    const firstConfirm = confirm(
+      'アカウントを削除しますか？プロフィール、いいね、マッチ、メッセージ等のデータが削除されます。'
+    );
+
+    if (!firstConfirm) return;
+
+    const secondConfirm = confirm(
+      'この操作は取り消せません。本当に削除しますか？'
+    );
+
+    if (!secondConfirm) return;
+
+    setIsDeleting(true);
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      alert('ログイン情報を取得できませんでした。');
+      setIsDeleting(false);
+      return;
+    }
+
+    try {
+      await supabase.rpc('delete_current_user');
+    } catch {
+      await supabase.from('withdrawal_requests').insert({
+        user_id: user.id,
+        email: user.email,
+        status: 'requested',
+      });
+    }
+
+    await supabase.auth.signOut();
+    setIsDeleting(false);
+    alert('アカウント削除を受け付けました。');
+    onLogout();
+  };
+
 
   const calculateAge = () => {
     if (!myProfile?.birth_year || !myProfile.birth_month || !myProfile.birth_day) {
@@ -150,6 +195,20 @@ export function MyPageScreen({ onLogout, onEdit, onOpenLegal }: Props) {
         <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
           <Text style={styles.logoutButtonText}>ログアウト</Text>
         </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.deleteButton, isDeleting && styles.deleteButtonDisabled]}
+          onPress={handleDeleteAccount}
+          disabled={isDeleting}
+        >
+          <Text style={styles.deleteButtonText}>
+            {isDeleting ? '削除処理中...' : 'アカウントを削除'}
+          </Text>
+        </TouchableOpacity>
+
+        <Text style={styles.deleteNote}>
+          削除後も、法令遵守・不正利用防止・問い合わせ対応のために必要な情報を一定期間保存する場合があります。
+        </Text>
       </ScrollView>
     </SafeAreaView>
   );
@@ -163,6 +222,7 @@ const colors = {
   text: '#2b2226',
   subText: '#75666c',
   border: '#ead9de',
+  danger: '#b3261e',
 };
 
 const styles = StyleSheet.create({
@@ -297,5 +357,29 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontSize: 16,
     fontWeight: '800',
+  },
+  deleteButton: {
+    borderWidth: 1,
+    borderColor: colors.danger,
+    borderRadius: 18,
+    paddingVertical: 15,
+    alignItems: 'center',
+    marginBottom: 10,
+    backgroundColor: colors.card,
+  },
+  deleteButtonDisabled: {
+    opacity: 0.5,
+  },
+  deleteButtonText: {
+    color: colors.danger,
+    fontSize: 16,
+    fontWeight: '900',
+  },
+  deleteNote: {
+    color: colors.subText,
+    fontSize: 12,
+    lineHeight: 19,
+    marginBottom: 36,
+    paddingHorizontal: 6,
   },
 });
