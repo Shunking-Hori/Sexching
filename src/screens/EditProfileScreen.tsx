@@ -444,6 +444,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
+    width: '100%',
+    maxWidth: 560,
+    alignSelf: 'center',
   },
   formContainer: {
     padding: 22,

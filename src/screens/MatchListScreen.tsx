@@ -7,7 +7,6 @@ import {
   View,
   TouchableOpacity,
   Image,
-  TextInput,
 } from 'react-native';
 import type { User } from '../../App';
 import { supabase } from '../lib/supabase';
@@ -17,7 +16,7 @@ type Props = {
   onSelectUser: (user: User) => void;
 };
 
-type DropdownType = 'prefecture' | null;
+type DropdownType = 'prefecture' | 'minAge' | 'maxAge' | null;
 
 type ProfileRow = {
   id: string;
@@ -36,6 +35,7 @@ type ProfileRow = {
 };
 
 const DAILY_LIKE_LIMIT = 10;
+const AGE_OPTIONS = Array.from({ length: 63 }, (_, index) => String(index + 18));
 
 export function MatchListScreen({ onSelectUser }: Props) {
   const [users, setUsers] = useState<User[]>([]);
@@ -171,6 +171,32 @@ export function MatchListScreen({ onSelectUser }: Props) {
       if (block.to_user === user.id) blockedUserIds.add(block.from_user);
     });
 
+    const { data: likes, error: likesError } = await supabase
+      .from('likes')
+      .select('from_user, to_user, is_match')
+      .or(`from_user.eq.${user.id},to_user.eq.${user.id}`);
+
+    if (likesError) {
+      alert(likesError.message);
+      setIsInitialLoading(false);
+      return;
+    }
+
+    const myLikedIds = new Set<string>();
+    const matchedUserIds = new Set<string>();
+
+    (likes || []).forEach((like) => {
+      if (like.from_user === user.id) {
+        myLikedIds.add(like.to_user);
+      }
+
+      if (like.is_match) {
+        matchedUserIds.add(like.from_user === user.id ? like.to_user : like.from_user);
+      }
+    });
+
+    setLikedUserIds(Array.from(myLikedIds));
+
     const { data: profiles, error: profilesError } = await supabase
       .from('profiles')
       .select('*')
@@ -185,21 +211,9 @@ export function MatchListScreen({ onSelectUser }: Props) {
       return;
     }
 
-    const { data: likes, error: likesError } = await supabase
-      .from('likes')
-      .select('to_user')
-      .eq('from_user', user.id);
-
-    if (likesError) {
-      alert(likesError.message);
-      setIsInitialLoading(false);
-      return;
-    }
-
-    setLikedUserIds((likes || []).map((like) => like.to_user));
-
     const displayUsers = (profiles || [])
       .filter((profile) => !blockedUserIds.has(profile.id))
+      .filter((profile) => !matchedUserIds.has(profile.id))
       .map(convertProfileToUser);
 
     setUsers(displayUsers);
@@ -264,48 +278,50 @@ export function MatchListScreen({ onSelectUser }: Props) {
     setOpenDropdown(null);
   };
 
-  const renderPrefectureDropdown = () => {
-    const isOpen = openDropdown === 'prefecture';
+  const renderDropdown = (
+    type: DropdownType,
+    value: string,
+    placeholder: string,
+    options: string[],
+    onSelect: (value: string) => void,
+    maxHeight = 190
+  ) => {
+    const isOpen = openDropdown === type;
 
     return (
       <View style={styles.dropdownWrapper}>
         <TouchableOpacity
           style={styles.dropdownButton}
-          onPress={() => setOpenDropdown(isOpen ? null : 'prefecture')}
+          onPress={() => setOpenDropdown(isOpen ? null : type)}
         >
-          <Text
-            style={[
-              styles.dropdownText,
-              !prefectureFilter && styles.placeholderText,
-            ]}
-          >
-            {prefectureFilter || '都道府県を選択'}
+          <Text style={[styles.dropdownText, !value && styles.placeholderText]}>
+            {value || placeholder}
           </Text>
           <Text style={styles.dropdownArrow}>{isOpen ? '▲' : '▼'}</Text>
         </TouchableOpacity>
 
         {isOpen && (
-          <ScrollView style={styles.dropdownList} nestedScrollEnabled>
+          <ScrollView style={[styles.dropdownList, { maxHeight }]} nestedScrollEnabled>
             <TouchableOpacity
               style={styles.dropdownItem}
               onPress={() => {
-                setPrefectureFilter('');
+                onSelect('');
                 setOpenDropdown(null);
               }}
             >
               <Text style={styles.dropdownItemText}>指定なし</Text>
             </TouchableOpacity>
 
-            {prefectures.map((prefecture) => (
+            {options.map((option) => (
               <TouchableOpacity
-                key={prefecture}
+                key={option}
                 style={styles.dropdownItem}
                 onPress={() => {
-                  setPrefectureFilter(prefecture);
+                  onSelect(option);
                   setOpenDropdown(null);
                 }}
               >
-                <Text style={styles.dropdownItemText}>{prefecture}</Text>
+                <Text style={styles.dropdownItemText}>{option}</Text>
               </TouchableOpacity>
             ))}
           </ScrollView>
@@ -317,9 +333,7 @@ export function MatchListScreen({ onSelectUser }: Props) {
   return (
     <SafeAreaView style={styles.container}>
       <Text style={styles.title}>おすすめのお相手</Text>
-      <Text style={styles.subtitle}>
-        
-      </Text>
+      <Text style={styles.subtitle}>条件に合う相手を探しましょう</Text>
 
       <View style={styles.limitCard}>
         <Text style={styles.limitText}>
@@ -332,25 +346,17 @@ export function MatchListScreen({ onSelectUser }: Props) {
 
         <Text style={styles.filterLabel}>年齢</Text>
         <View style={styles.ageRow}>
-          <TextInput
-            style={styles.ageInput}
-            value={minAge}
-            onChangeText={setMinAge}
-            placeholder="最小"
-            keyboardType="numeric"
-          />
+          <View style={styles.ageDropdownBox}>
+            {renderDropdown('minAge', minAge, '最小', AGE_OPTIONS, setMinAge, 170)}
+          </View>
           <Text style={styles.ageSeparator}>〜</Text>
-          <TextInput
-            style={styles.ageInput}
-            value={maxAge}
-            onChangeText={setMaxAge}
-            placeholder="最大"
-            keyboardType="numeric"
-          />
+          <View style={styles.ageDropdownBox}>
+            {renderDropdown('maxAge', maxAge, '最大', AGE_OPTIONS, setMaxAge, 170)}
+          </View>
         </View>
 
         <Text style={styles.filterLabel}>都道府県</Text>
-        {renderPrefectureDropdown()}
+        {renderDropdown('prefecture', prefectureFilter, '都道府県を選択', prefectures, setPrefectureFilter)}
 
         <TouchableOpacity style={styles.resetButton} onPress={resetFilters}>
           <Text style={styles.resetButtonText}>条件をリセット</Text>
@@ -368,7 +374,7 @@ export function MatchListScreen({ onSelectUser }: Props) {
         </View>
       )}
 
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.listContent}>
         {filteredUsers.map((user) => {
           const isLiked = likedUserIds.includes(user.id);
           const isLimitReached = todayLikeCount >= DAILY_LIKE_LIMIT;
@@ -413,7 +419,7 @@ export function MatchListScreen({ onSelectUser }: Props) {
               >
                 <Text style={styles.likeText}>
                   {isLiked
-                    ? '承認待ち'
+                    ? '送信済み'
                     : isLimitReached
                       ? '本日の上限に到達'
                       : '♡ いいね'}
@@ -442,19 +448,24 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
-    padding: 20,
+    paddingHorizontal: 18,
+    paddingTop: 18,
+    paddingBottom: 10,
+    width: '100%',
+    maxWidth: 560,
+    alignSelf: 'center',
   },
   title: {
-    fontSize: 30,
+    fontSize: 28,
     fontWeight: '800',
     color: colors.text,
-    marginTop: 12,
+    marginTop: 6,
   },
   subtitle: {
     fontSize: 14,
     color: colors.subText,
     marginTop: 6,
-    marginBottom: 10,
+    marginBottom: 12,
   },
   limitCard: {
     backgroundColor: colors.card,
@@ -474,7 +485,7 @@ const styles = StyleSheet.create({
   filterCard: {
     backgroundColor: colors.card,
     borderRadius: 20,
-    padding: 14,
+    padding: 16,
     borderWidth: 1,
     borderColor: colors.border,
     marginBottom: 16,
@@ -495,25 +506,21 @@ const styles = StyleSheet.create({
   },
   ageRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: 8,
+    zIndex: 50,
   },
-  ageInput: {
+  ageDropdownBox: {
     flex: 1,
-    backgroundColor: colors.background,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 14,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
   },
   ageSeparator: {
     color: colors.subText,
     fontWeight: '800',
+    paddingTop: 12,
   },
   dropdownWrapper: {
     position: 'relative',
-    zIndex: 30,
+    zIndex: 60,
   },
   dropdownButton: {
     backgroundColor: colors.background,
@@ -544,8 +551,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     borderRadius: 14,
     marginTop: 6,
-    maxHeight: 190,
-    zIndex: 40,
+    zIndex: 70,
   },
   dropdownItem: {
     paddingVertical: 12,
@@ -559,7 +565,8 @@ const styles = StyleSheet.create({
   },
   resetButton: {
     alignSelf: 'center',
-    marginTop: 10,
+    marginTop: 12,
+    paddingVertical: 4,
   },
   resetButtonText: {
     color: colors.primary,
@@ -569,6 +576,9 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.subText,
     marginTop: 20,
+  },
+  listContent: {
+    paddingBottom: 28,
   },
   emptyCard: {
     backgroundColor: colors.card,
@@ -622,29 +632,28 @@ const styles = StyleSheet.create({
     color: colors.primary,
   },
   name: {
-    fontSize: 21,
+    fontSize: 20,
     fontWeight: '800',
     color: colors.text,
     textAlign: 'center',
+    marginBottom: 8,
   },
   prefecture: {
     fontSize: 14,
     color: colors.subText,
     textAlign: 'center',
-    marginTop: 5,
+    marginBottom: 12,
   },
   profile: {
-    fontSize: 15,
+    fontSize: 14,
     color: colors.text,
-    textAlign: 'center',
-    lineHeight: 23,
-    marginTop: 14,
+    lineHeight: 22,
+    marginBottom: 18,
   },
   likeButton: {
-    marginTop: 18,
     backgroundColor: colors.primary,
-    paddingVertical: 14,
     borderRadius: 16,
+    paddingVertical: 13,
     alignItems: 'center',
   },
   likeButtonLiked: {
@@ -652,7 +661,7 @@ const styles = StyleSheet.create({
   },
   likeText: {
     color: '#fff',
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '800',
   },
 });

@@ -169,7 +169,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
-    padding: 20,
+    paddingHorizontal: 18,
+    paddingTop: 18,
+    paddingBottom: 10,
+    width: '100%',
+    maxWidth: 560,
+    alignSelf: 'center',
   },
   title: {
     fontSize: 30,

@@ -14,7 +14,7 @@ import { supabase } from '../lib/supabase';
 
 type Props = {
   user: User;
-  onBack: () => void;
+  onBack: (refresh?: boolean) => void;
 };
 
 const reportReasons = [
@@ -136,7 +136,7 @@ export function ProfileDetailScreen({ user, onBack }: Props) {
           }
 
           alert('ブロックしました。');
-          onBack();
+          onBack(true);
         },
       },
     ]);
@@ -184,7 +184,10 @@ export function ProfileDetailScreen({ user, onBack }: Props) {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
-        <TouchableOpacity style={styles.backButton} onPress={onBack}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => onBack()}
+        >
           <Text style={styles.backButtonText}>← 戻る</Text>
         </TouchableOpacity>
 
@@ -302,6 +305,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
+    width: '100%',
+    maxWidth: 560,
+    alignSelf: 'center',
   },
   content: {
     padding: 20,

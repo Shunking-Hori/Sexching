@@ -7,6 +7,8 @@ import {
   ScrollView,
   TouchableOpacity,
   Image,
+  Alert,
+  Platform,
 } from 'react-native';
 import { supabase } from '../lib/supabase';
 
@@ -149,6 +151,61 @@ export function MatchesScreen({ onOpenChat }: Props) {
     setIsInitialLoading(false);
   };
 
+
+  const confirmBlock = (partnerName: string): Promise<boolean> => {
+    if (Platform.OS === 'web') {
+      const webConfirm = (globalThis as unknown as { confirm?: (message: string) => boolean }).confirm;
+      return Promise.resolve(
+        typeof webConfirm === 'function'
+          ? webConfirm(`${partnerName}さんをブロックしますか？`)
+          : true
+      );
+    }
+
+    return new Promise((resolve) => {
+      Alert.alert('ブロック', `${partnerName}さんをブロックしますか？`, [
+        { text: 'キャンセル', style: 'cancel', onPress: () => resolve(false) },
+        { text: 'ブロック', style: 'destructive', onPress: () => resolve(true) },
+      ]);
+    });
+  };
+
+  const blockUser = async (partnerId: string, partnerName: string) => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      alert('ログイン情報を取得できませんでした。');
+      return;
+    }
+
+    const shouldBlock = await confirmBlock(partnerName);
+    if (!shouldBlock) return;
+
+    const { error } = await supabase.from('blocks').insert({
+      from_user: user.id,
+      to_user: partnerId,
+    });
+
+    if (error && error.code !== '23505') {
+      alert(error.message);
+      return;
+    }
+
+    await supabase
+      .from('likes')
+      .update({ is_match: false, status: 'blocked' })
+      .or(
+        `and(from_user.eq.${user.id},to_user.eq.${partnerId}),and(from_user.eq.${partnerId},to_user.eq.${user.id})`
+      );
+
+    alert('ブロックしました。');
+    setMatches((current) =>
+      current.filter((match) => match.partnerId !== partnerId)
+    );
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <Text style={styles.title}>マッチ</Text>
@@ -209,7 +266,19 @@ export function MatchesScreen({ onOpenChat }: Props) {
                 : ''}
             </Text>
 
-            <Text style={styles.chatHint}>タップしてチャットを開始</Text>
+            <View style={styles.matchActionRow}>
+              <Text style={styles.chatHint}>タップしてチャットを開始</Text>
+
+              <TouchableOpacity
+                style={styles.blockButton}
+                onPress={(event) => {
+                  event.stopPropagation();
+                  blockUser(match.partnerId, match.partnerName);
+                }}
+              >
+                <Text style={styles.blockButtonText}>ブロック</Text>
+              </TouchableOpacity>
+            </View>
           </TouchableOpacity>
         ))}
       </ScrollView>
@@ -232,7 +301,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
-    padding: 20,
+    paddingHorizontal: 18,
+    paddingTop: 18,
+    paddingBottom: 10,
+    width: '100%',
+    maxWidth: 560,
+    alignSelf: 'center',
   },
   title: {
     fontSize: 30,
@@ -337,6 +411,25 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontWeight: '800',
     marginTop: 10,
+  },
+
+  matchActionRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  blockButton: {
+    borderWidth: 1,
+    borderColor: colors.red,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+  },
+  blockButtonText: {
+    color: colors.red,
+    fontSize: 12,
+    fontWeight: '800',
   },
   badge: {
     minWidth: 26,

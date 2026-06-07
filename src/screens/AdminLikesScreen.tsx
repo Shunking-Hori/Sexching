@@ -6,8 +6,16 @@ import {
   View,
   ScrollView,
   TouchableOpacity,
+  Image,
 } from 'react-native';
 import { supabase } from '../lib/supabase';
+
+type ProfileSummary = {
+  id: string;
+  nickname: string | null;
+  photo_url: string | null;
+  photo_urls: string[] | null;
+};
 
 type PendingLike = {
   id: number;
@@ -15,6 +23,8 @@ type PendingLike = {
   to_user: string;
   created_at: string;
   status: string;
+  fromProfile?: ProfileSummary | null;
+  toProfile?: ProfileSummary | null;
 };
 
 type ReportRow = {
@@ -27,6 +37,16 @@ type ReportRow = {
 };
 
 type AdminTab = 'likes' | 'reports';
+
+const getProfilePhotoUrl = (profile?: ProfileSummary | null) => {
+  if (!profile) return null;
+
+  if (profile.photo_urls && profile.photo_urls.length > 0) {
+    return profile.photo_urls[0];
+  }
+
+  return profile.photo_url || null;
+};
 
 export function AdminLikesScreen() {
   const [activeTab, setActiveTab] = useState<AdminTab>('likes');
@@ -45,18 +65,49 @@ export function AdminLikesScreen() {
   };
 
   const loadPendingLikes = async () => {
-    const { data, error } = await supabase
+    const { data: likeRows, error: likeError } = await supabase
       .from('likes')
       .select('id, from_user, to_user, created_at, status')
       .eq('status', 'pending')
       .order('created_at', { ascending: false });
 
-    if (error) {
-      alert(error.message);
+    if (likeError) {
+      alert(likeError.message);
       return;
     }
 
-    setLikes(data || []);
+    const rows = likeRows || [];
+    const userIds = Array.from(
+      new Set(rows.flatMap((like) => [like.from_user, like.to_user]))
+    );
+
+    if (userIds.length === 0) {
+      setLikes([]);
+      return;
+    }
+
+    const { data: profiles, error: profileError } = await supabase
+      .from('profiles')
+      .select('id, nickname, photo_url, photo_urls')
+      .in('id', userIds);
+
+    if (profileError) {
+      alert(profileError.message);
+      return;
+    }
+
+    const profileMap = new Map<string, ProfileSummary>();
+    (profiles || []).forEach((profile) => {
+      profileMap.set(profile.id, profile);
+    });
+
+    setLikes(
+      rows.map((like) => ({
+        ...like,
+        fromProfile: profileMap.get(like.from_user) || null,
+        toProfile: profileMap.get(like.to_user) || null,
+      }))
+    );
   };
 
   const loadReports = async () => {
@@ -197,6 +248,38 @@ export function AdminLikesScreen() {
     loadReports();
   };
 
+  const renderProfileBox = (
+    label: string,
+    userId: string,
+    profile?: ProfileSummary | null
+  ) => {
+    const photoUrl = getProfilePhotoUrl(profile);
+    const name = profile?.nickname || '未設定';
+
+    return (
+      <View style={styles.profileBox}>
+        <Text style={styles.profileLabel}>{label}</Text>
+
+        <View style={styles.profileRow}>
+          {photoUrl ? (
+            <Image source={{ uri: photoUrl }} style={styles.profileImage} />
+          ) : (
+            <View style={styles.profileImagePlaceholder}>
+              <Text style={styles.profileImagePlaceholderText}>
+                {name.substring(0, 1)}
+              </Text>
+            </View>
+          )}
+
+          <View style={styles.profileTextArea}>
+            <Text style={styles.profileName}>{name}</Text>
+            <Text style={styles.profileId}>{userId}</Text>
+          </View>
+        </View>
+      </View>
+    );
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <Text style={styles.title}>管理</Text>
@@ -249,11 +332,11 @@ export function AdminLikesScreen() {
             <View key={like.id} style={styles.card}>
               <Text style={styles.cardTitle}>いいね承認依頼</Text>
 
-              <Text style={styles.label}>送信者</Text>
-              <Text style={styles.value}>{like.from_user}</Text>
-
-              <Text style={styles.label}>受信者</Text>
-              <Text style={styles.value}>{like.to_user}</Text>
+              <View style={styles.likeUsersArea}>
+                {renderProfileBox('いいねした人', like.from_user, like.fromProfile)}
+                <Text style={styles.arrowText}>↓</Text>
+                {renderProfileBox('いいねされた人', like.to_user, like.toProfile)}
+              </View>
 
               <Text style={styles.label}>送信日時</Text>
               <Text style={styles.value}>
@@ -371,13 +454,19 @@ const colors = {
   text: '#2b2226',
   subText: '#75666c',
   border: '#ead9de',
+  accent: '#f4d4dc',
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
-    padding: 20,
+    paddingHorizontal: 18,
+    paddingTop: 18,
+    paddingBottom: 10,
+    width: '100%',
+    maxWidth: 560,
+    alignSelf: 'center',
   },
   title: {
     fontSize: 30,
@@ -463,6 +552,66 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: colors.text,
     marginBottom: 14,
+  },
+  likeUsersArea: {
+    gap: 10,
+    marginBottom: 8,
+  },
+  profileBox: {
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 18,
+    padding: 12,
+  },
+  profileLabel: {
+    fontSize: 12,
+    color: colors.subText,
+    fontWeight: '800',
+    marginBottom: 8,
+  },
+  profileRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  profileImage: {
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    marginRight: 12,
+  },
+  profileImagePlaceholder: {
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    marginRight: 12,
+    backgroundColor: colors.accent,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  profileImagePlaceholderText: {
+    color: colors.primary,
+    fontSize: 22,
+    fontWeight: '800',
+  },
+  profileTextArea: {
+    flex: 1,
+  },
+  profileName: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: colors.text,
+  },
+  profileId: {
+    fontSize: 11,
+    color: colors.subText,
+    marginTop: 4,
+  },
+  arrowText: {
+    color: colors.primary,
+    fontSize: 18,
+    fontWeight: '800',
+    textAlign: 'center',
   },
   statusBadge: {
     borderRadius: 999,

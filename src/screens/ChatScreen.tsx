@@ -9,6 +9,7 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
+  Alert,
 } from 'react-native';
 import { supabase } from '../lib/supabase';
 
@@ -123,6 +124,55 @@ export function ChatScreen({ partnerId, partnerName, onBack }: Props) {
     onBack();
   };
 
+
+  const confirmBlock = (): Promise<boolean> => {
+    if (Platform.OS === 'web') {
+      const webConfirm = (globalThis as unknown as { confirm?: (message: string) => boolean }).confirm;
+      return Promise.resolve(
+        typeof webConfirm === 'function'
+          ? webConfirm(`${partnerName}さんをブロックしますか？`)
+          : true
+      );
+    }
+
+    return new Promise((resolve) => {
+      Alert.alert('ブロック', `${partnerName}さんをブロックしますか？`, [
+        { text: 'キャンセル', style: 'cancel', onPress: () => resolve(false) },
+        { text: 'ブロック', style: 'destructive', onPress: () => resolve(true) },
+      ]);
+    });
+  };
+
+  const blockUser = async () => {
+    if (!myId) {
+      alert('ログイン情報を取得できませんでした。');
+      return;
+    }
+
+    const shouldBlock = await confirmBlock();
+    if (!shouldBlock) return;
+
+    const { error } = await supabase.from('blocks').insert({
+      from_user: myId,
+      to_user: partnerId,
+    });
+
+    if (error && error.code !== '23505') {
+      alert(error.message);
+      return;
+    }
+
+    await supabase
+      .from('likes')
+      .update({ is_match: false, status: 'blocked' })
+      .or(
+        `and(from_user.eq.${myId},to_user.eq.${partnerId}),and(from_user.eq.${partnerId},to_user.eq.${myId})`
+      );
+
+    alert('ブロックしました。');
+    onBack();
+  };
+
   const sendMessage = async () => {
     if (!text.trim() || !myId || isSending) return;
 
@@ -152,7 +202,13 @@ export function ChatScreen({ partnerId, partnerName, onBack }: Props) {
           <Text style={styles.backText}>← 戻る</Text>
         </TouchableOpacity>
 
-        <Text style={styles.headerTitle}>{partnerName}</Text>
+        <View style={styles.headerTitleRow}>
+          <Text style={styles.headerTitle}>{partnerName}</Text>
+
+          <TouchableOpacity style={styles.blockButton} onPress={blockUser}>
+            <Text style={styles.blockButtonText}>ブロック</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <KeyboardAvoidingView
@@ -258,6 +314,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
+    width: '100%',
+    maxWidth: 560,
+    alignSelf: 'center',
   },
   header: {
     backgroundColor: colors.card,
@@ -275,6 +334,24 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: '800',
     color: colors.text,
+  },
+
+  headerTitleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  blockButton: {
+    borderWidth: 1,
+    borderColor: colors.primary,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+  },
+  blockButtonText: {
+    color: colors.primary,
+    fontSize: 12,
+    fontWeight: '800',
   },
   chatArea: {
     flex: 1,

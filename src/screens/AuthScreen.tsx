@@ -102,7 +102,11 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
     justifyContent: 'center',
-    padding: 24,
+    paddingHorizontal: 24,
+    paddingVertical: 28,
+    width: '100%',
+    maxWidth: 560,
+    alignSelf: 'center',
   },
   card: {
     backgroundColor: colors.card,

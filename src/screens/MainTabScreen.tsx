@@ -30,6 +30,7 @@ export function MainTabScreen({ onLogout }: Props) {
   const [isAdmin, setIsAdmin] = useState(false);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [matchesRefreshKey, setMatchesRefreshKey] = useState(0);
+  const [matchListRefreshKey, setMatchListRefreshKey] = useState(0);
   const [legalType, setLegalType] = useState<'terms' | 'privacy' | 'contact' | null>(null);
   const [chatPartner, setChatPartner] = useState<{
     id: string;
@@ -69,7 +70,12 @@ export function MainTabScreen({ onLogout }: Props) {
     return (
       <ProfileDetailScreen
         user={selectedUser}
-        onBack={() => setSelectedUser(null)}
+        onBack={(refresh) => {
+          setSelectedUser(null);
+          if (refresh) {
+            setMatchListRefreshKey((current) => current + 1);
+          }
+        }}
       />
     );
   }
@@ -128,7 +134,12 @@ export function MainTabScreen({ onLogout }: Props) {
       );
     }
 
-    return <MatchListScreen onSelectUser={setSelectedUser} />;
+    return (
+      <MatchListScreen
+        key={matchListRefreshKey}
+        onSelectUser={setSelectedUser}
+      />
+    );
   };
 
   return (
@@ -212,10 +223,16 @@ const styles = StyleSheet.create({
   },
   screenArea: {
     flex: 1,
+    width: '100%',
+    maxWidth: 560,
+    alignSelf: 'center',
   },
   tabBar: {
     height: 74,
     backgroundColor: colors.card,
+    width: '100%',
+    maxWidth: 560,
+    alignSelf: 'center',
     borderTopWidth: 1,
     borderTopColor: colors.border,
     flexDirection: 'row',

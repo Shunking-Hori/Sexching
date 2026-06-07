@@ -59,6 +59,9 @@ const styles = StyleSheet.create({
   },
   heroCard: {
     backgroundColor: colors.card,
+    width: '100%',
+    maxWidth: 520,
+    alignSelf: 'center',
     borderRadius: 28,
     paddingVertical: 44,
     paddingHorizontal: 26,
