@@ -14,7 +14,7 @@ import { supabase } from '../lib/supabase';
 
 type Props = {
   user: User;
-  onBack: (refresh?: boolean) => void;
+  onBack: () => void;
 };
 
 const reportReasons = [
@@ -106,7 +106,6 @@ export function ProfileDetailScreen({ user, onBack }: Props) {
   }
 
   setIsLiked(true);
-  alert('いいねを送信しました。管理者承認後に相手へ表示されます。');
 };
 
   const blockUser = async () => {
@@ -135,8 +134,7 @@ export function ProfileDetailScreen({ user, onBack }: Props) {
             return;
           }
 
-          alert('ブロックしました。');
-          onBack(true);
+          onBack();
         },
       },
     ]);
@@ -164,7 +162,6 @@ export function ProfileDetailScreen({ user, onBack }: Props) {
       return;
     }
 
-    alert('通報しました。');
   };
 
   const reportUser = () => {
@@ -184,10 +181,7 @@ export function ProfileDetailScreen({ user, onBack }: Props) {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => onBack()}
-        >
+        <TouchableOpacity style={styles.backButton} onPress={onBack}>
           <Text style={styles.backButtonText}>← 戻る</Text>
         </TouchableOpacity>
 

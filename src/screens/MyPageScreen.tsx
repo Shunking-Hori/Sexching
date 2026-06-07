@@ -99,7 +99,6 @@ export function MyPageScreen({ onLogout, onEdit, onOpenLegal }: Props) {
 
     await supabase.auth.signOut();
     setIsDeleting(false);
-    alert('アカウント削除を受け付けました。');
     onLogout();
   };
 

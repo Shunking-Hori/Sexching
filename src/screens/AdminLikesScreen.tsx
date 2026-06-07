@@ -148,7 +148,6 @@ export function AdminLikesScreen() {
       return;
     }
 
-    alert('いいねを承認しました。');
     loadPendingLikes();
   };
 
@@ -176,7 +175,6 @@ export function AdminLikesScreen() {
       return;
     }
 
-    alert('いいねを却下しました。');
     loadPendingLikes();
   };
 
@@ -216,7 +214,6 @@ export function AdminLikesScreen() {
         .eq('id', reportId);
     }
 
-    alert('ユーザーを利用停止にしました。');
     loadReports();
   };
 
@@ -244,7 +241,6 @@ export function AdminLikesScreen() {
       return;
     }
 
-    alert('通報を対応済みにしました。');
     loadReports();
   };
 

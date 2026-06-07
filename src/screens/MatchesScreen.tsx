@@ -200,7 +200,6 @@ export function MatchesScreen({ onOpenChat }: Props) {
         `and(from_user.eq.${user.id},to_user.eq.${partnerId}),and(from_user.eq.${partnerId},to_user.eq.${user.id})`
       );
 
-    alert('ブロックしました。');
     setMatches((current) =>
       current.filter((match) => match.partnerId !== partnerId)
     );

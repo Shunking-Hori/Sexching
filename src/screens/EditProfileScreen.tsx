@@ -178,7 +178,6 @@ export function EditProfileScreen({ onBack, onSaved }: Props) {
     try {
       const publicUrl = await uploadProfilePhoto(result.assets[0].uri, user.id);
       setPhotoUrls([...photoUrls, publicUrl]);
-      alert('写真をアップロードしました。保存ボタンを押すと反映されます。');
     } catch {
       alert('写真のアップロードに失敗しました。');
     }
@@ -238,7 +237,6 @@ export function EditProfileScreen({ onBack, onSaved }: Props) {
       return;
     }
 
-    alert('プロフィールを更新しました。');
     onSaved();
   };
 

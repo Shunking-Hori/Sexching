@@ -268,7 +268,6 @@ export function MatchListScreen({ onSelectUser }: Props) {
 
     setLikedUserIds([...likedUserIds, toUserId]);
     setTodayLikeCount(todayLikeCount + 1);
-    alert('いいねを送信しました。');
   };
 
   const resetFilters = () => {

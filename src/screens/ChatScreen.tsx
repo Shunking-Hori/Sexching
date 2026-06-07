@@ -169,7 +169,6 @@ export function ChatScreen({ partnerId, partnerName, onBack }: Props) {
         `and(from_user.eq.${myId},to_user.eq.${partnerId}),and(from_user.eq.${partnerId},to_user.eq.${myId})`
       );
 
-    alert('ブロックしました。');
     onBack();
   };
 

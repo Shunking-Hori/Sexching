@@ -134,7 +134,6 @@ export function ProfileScreen({ onComplete }: Props) {
     try {
       const publicUrl = await uploadProfilePhoto(result.assets[0].uri, user.id);
       setPhotoUri(publicUrl);
-      alert('写真をアップロードしました。');
     } catch {
       alert('写真のアップロードに失敗しました。');
     }
@@ -181,7 +180,6 @@ export function ProfileScreen({ onComplete }: Props) {
       return;
     }
 
-    alert('プロフィールを保存しました。');
     onComplete();
   };
 

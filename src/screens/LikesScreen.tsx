@@ -184,7 +184,6 @@ export function LikesScreen() {
       return;
     }
 
-    alert('いいねを承認しました。マッチ成立です。');
     loadApprovedLikes();
   };
 
@@ -203,7 +202,6 @@ export function LikesScreen() {
       return;
     }
 
-    alert('いいねを却下しました。');
     loadApprovedLikes();
   };
 

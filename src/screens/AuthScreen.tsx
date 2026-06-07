@@ -92,7 +92,6 @@ export function AuthScreen({ onComplete, onOpenLegal }: Props) {
       return;
     }
 
-    alert('登録が完了しました。続いてプロフィールを作成してください。');
     onComplete();
   };
 
