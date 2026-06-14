@@ -280,6 +280,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     width: '100%',
+    maxWidth: '100%',
     height: Platform.OS === 'web' ? ('100dvh' as any) : '100%',
     backgroundColor: colors.background,
     overflow: 'hidden' as any,
@@ -287,6 +288,7 @@ const styles = StyleSheet.create({
   keyboardArea: {
     flex: 1,
     width: '100%',
+    maxWidth: '100%',
     overflow: 'hidden' as any,
   },
   screen: {
@@ -294,13 +296,13 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 520,
     alignSelf: 'center',
-    paddingHorizontal: 14,
-    paddingTop: Platform.OS === 'web' ? 34 : 14,
+    paddingHorizontal: 12,
+    paddingTop: Platform.OS === 'web' ? 44 : 14,
     paddingBottom: 8,
     overflow: 'hidden' as any,
   },
   header: {
-    height: 46,
+    height: 44,
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 8,
@@ -310,7 +312,7 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontSize: 14,
     fontWeight: '800',
-    width: 72,
+    width: 68,
   },
   title: {
     flex: 1,
@@ -324,9 +326,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.primary,
     borderRadius: 999,
-    paddingHorizontal: 10,
+    paddingHorizontal: 8,
     paddingVertical: 6,
-    width: 72,
+    width: 68,
     alignItems: 'center',
   },
   blockButtonText: {
@@ -335,11 +337,12 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   headerRightSpacer: {
-    width: 72,
+    width: 68,
   },
   chatArea: {
     flex: 1,
     width: '100%',
+    maxWidth: '100%',
     backgroundColor: colors.card,
     borderRadius: 22,
     borderWidth: 1,
@@ -348,10 +351,13 @@ const styles = StyleSheet.create({
   },
   messageList: {
     flex: 1,
+    width: '100%',
+    maxWidth: '100%',
     backgroundColor: colors.background,
   },
   messageListContent: {
-    padding: 14,
+    paddingHorizontal: 12,
+    paddingTop: 12,
     paddingBottom: 20,
   },
   emptyArea: {
@@ -371,6 +377,7 @@ const styles = StyleSheet.create({
   },
   messageRow: {
     width: '100%',
+    maxWidth: '100%',
     marginBottom: 12,
   },
   myMessageRow: {
@@ -396,8 +403,8 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 6,
   },
   messageText: {
-    fontSize: 15,
-    lineHeight: 22,
+    fontSize: 16,
+    lineHeight: 23,
     fontWeight: '600',
   },
   myMessageText: {
@@ -407,7 +414,7 @@ const styles = StyleSheet.create({
     color: colors.text,
   },
   timeText: {
-    fontSize: 10,
+    fontSize: 11,
     marginTop: 5,
     textAlign: 'right',
   },
@@ -420,6 +427,8 @@ const styles = StyleSheet.create({
   inputArea: {
     flexDirection: 'row',
     gap: 8,
+    width: '100%',
+    maxWidth: '100%',
     paddingHorizontal: 10,
     paddingVertical: 10,
     backgroundColor: colors.card,
@@ -427,6 +436,7 @@ const styles = StyleSheet.create({
     borderTopColor: colors.border,
     alignItems: 'center',
     flexShrink: 0,
+    overflow: 'hidden' as any,
   },
   input: {
     flex: 1,
@@ -437,7 +447,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     paddingHorizontal: 14,
     backgroundColor: colors.background,
-    fontSize: 15,
+    fontSize: 16,
     color: colors.text,
   },
   sendButton: {
@@ -454,7 +464,7 @@ const styles = StyleSheet.create({
   },
   sendButtonText: {
     color: '#fff',
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '800',
   },
 });
