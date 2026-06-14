@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   Alert,
+  Platform,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -10,32 +11,65 @@ import {
 } from 'react-native';
 import { supabase } from '../lib/supabase';
 
+type InquiryStatus = 'open' | 'closed' | 'all';
+
 type InquiryRow = {
   id: number;
-  user_id: string;
+  user_id: string | null;
   email: string | null;
   category: string;
   message: string;
   status: string | null;
   created_at: string;
   handled_at: string | null;
+  handled_by?: string | null;
 };
 
 export function AdminInquiriesScreen() {
   const [inquiries, setInquiries] = useState<InquiryRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [activeStatus, setActiveStatus] = useState<'open' | 'closed' | 'all'>('open');
+  const [activeStatus, setActiveStatus] = useState<InquiryStatus>('open');
 
   useEffect(() => {
     loadInquiries();
   }, [activeStatus]);
+
+  const showError = (message: string) => {
+    if (Platform.OS === 'web') {
+      alert(message);
+      return;
+    }
+
+    Alert.alert('エラー', message);
+  };
+
+  const confirmAction = (message: string): Promise<boolean> => {
+    if (Platform.OS === 'web') {
+      const webConfirm = (
+        globalThis as unknown as { confirm?: (message: string) => boolean }
+      ).confirm;
+
+      return Promise.resolve(
+        typeof webConfirm === 'function' ? webConfirm(message) : true
+      );
+    }
+
+    return new Promise((resolve) => {
+      Alert.alert('確認', message, [
+        { text: 'キャンセル', style: 'cancel', onPress: () => resolve(false) },
+        { text: 'OK', onPress: () => resolve(true) },
+      ]);
+    });
+  };
 
   const loadInquiries = async () => {
     setIsLoading(true);
 
     let query = supabase
       .from('inquiries')
-      .select('id, user_id, email, category, message, status, created_at, handled_at')
+      .select(
+        'id, user_id, email, category, message, status, created_at, handled_at, handled_by'
+      )
       .order('created_at', { ascending: false });
 
     if (activeStatus !== 'all') {
@@ -43,51 +77,52 @@ export function AdminInquiriesScreen() {
     }
 
     const { data, error } = await query;
-    setIsLoading(false);
 
     if (error) {
-      Alert.alert('エラー', error.message);
+      setIsLoading(false);
+      showError(error.message);
       return;
     }
 
-    setInquiries(data || []);
+    setInquiries((data || []) as InquiryRow[]);
+    setIsLoading(false);
   };
 
   const closeInquiry = async (id: number) => {
-    Alert.alert(
-      '確認',
-      'このお問い合わせを対応済みにしますか？',
-      [
-        { text: 'キャンセル', style: 'cancel' },
-        {
-          text: '対応済みにする',
-          onPress: async () => {
-            const {
-              data: { user },
-            } = await supabase.auth.getUser();
-
-            const { error } = await supabase
-              .from('inquiries')
-              .update({
-                status: 'closed',
-                handled_at: new Date().toISOString(),
-                handled_by: user?.id || null,
-              })
-              .eq('id', id);
-
-            if (error) {
-              Alert.alert('エラー', error.message);
-              return;
-            }
-
-            loadInquiries();
-          },
-        },
-      ]
+    const shouldClose = await confirmAction(
+      'このお問い合わせを対応済みにしますか？'
     );
+
+    if (!shouldClose) return;
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    const { error } = await supabase
+      .from('inquiries')
+      .update({
+        status: 'closed',
+        handled_at: new Date().toISOString(),
+        handled_by: user?.id || null,
+      })
+      .eq('id', id);
+
+    if (error) {
+      showError(error.message);
+      return;
+    }
+
+    await loadInquiries();
   };
 
   const reopenInquiry = async (id: number) => {
+    const shouldReopen = await confirmAction(
+      'このお問い合わせを未対応に戻しますか？'
+    );
+
+    if (!shouldReopen) return;
+
     const { error } = await supabase
       .from('inquiries')
       .update({
@@ -98,23 +133,40 @@ export function AdminInquiriesScreen() {
       .eq('id', id);
 
     if (error) {
-      Alert.alert('エラー', error.message);
+      showError(error.message);
       return;
     }
 
-    loadInquiries();
+    await loadInquiries();
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
         <Text style={styles.title}>お問い合わせ管理</Text>
-        <Text style={styles.subtitle}>アプリ内から送信された問い合わせを確認します。</Text>
+        <Text style={styles.subtitle}>
+          アプリ内から送信された問い合わせを確認します。
+        </Text>
 
         <View style={styles.statusTabs}>
-          <StatusButton label="未対応" active={activeStatus === 'open'} onPress={() => setActiveStatus('open')} />
-          <StatusButton label="対応済み" active={activeStatus === 'closed'} onPress={() => setActiveStatus('closed')} />
-          <StatusButton label="すべて" active={activeStatus === 'all'} onPress={() => setActiveStatus('all')} />
+          <StatusButton
+            label="未対応"
+            active={activeStatus === 'open'}
+            onPress={() => setActiveStatus('open')}
+          />
+          <StatusButton
+            label="対応済み"
+            active={activeStatus === 'closed'}
+            onPress={() => setActiveStatus('closed')}
+          />
+          <StatusButton
+            label="すべて"
+            active={activeStatus === 'all'}
+            onPress={() => setActiveStatus('all')}
+          />
         </View>
 
         <TouchableOpacity style={styles.reloadButton} onPress={loadInquiries}>
@@ -126,30 +178,56 @@ export function AdminInquiriesScreen() {
         ) : inquiries.length === 0 ? (
           <Text style={styles.emptyText}>該当するお問い合わせはありません。</Text>
         ) : (
-          inquiries.map((item) => (
-            <View key={item.id} style={styles.card}>
-              <View style={styles.cardHeader}>
-                <Text style={styles.category}>{item.category}</Text>
-                <Text style={[styles.status, item.status === 'closed' && styles.statusClosed]}>
-                  {item.status === 'closed' ? '対応済み' : '未対応'}
+          inquiries.map((item) => {
+            const isClosed = item.status === 'closed';
+
+            return (
+              <View key={item.id} style={styles.card}>
+                <View style={styles.cardHeader}>
+                  <Text style={styles.category}>{item.category}</Text>
+                  <Text
+                    style={[
+                      styles.status,
+                      isClosed && styles.statusClosed,
+                    ]}
+                  >
+                    {isClosed ? '対応済み' : '未対応'}
+                  </Text>
+                </View>
+
+                <Text style={styles.meta}>
+                  日時：{new Date(item.created_at).toLocaleString()}
                 </Text>
+                <Text style={styles.meta}>
+                  ユーザー：{item.email || item.user_id || '不明'}
+                </Text>
+
+                {item.handled_at && (
+                  <Text style={styles.meta}>
+                    対応日時：{new Date(item.handled_at).toLocaleString()}
+                  </Text>
+                )}
+
+                <Text style={styles.message}>{item.message}</Text>
+
+                {isClosed ? (
+                  <TouchableOpacity
+                    style={styles.secondaryButton}
+                    onPress={() => reopenInquiry(item.id)}
+                  >
+                    <Text style={styles.secondaryButtonText}>未対応に戻す</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity
+                    style={styles.primaryButton}
+                    onPress={() => closeInquiry(item.id)}
+                  >
+                    <Text style={styles.primaryButtonText}>対応済みにする</Text>
+                  </TouchableOpacity>
+                )}
               </View>
-
-              <Text style={styles.meta}>日時：{new Date(item.created_at).toLocaleString()}</Text>
-              <Text style={styles.meta}>ユーザー：{item.email || item.user_id}</Text>
-              <Text style={styles.message}>{item.message}</Text>
-
-              {item.status === 'closed' ? (
-                <TouchableOpacity style={styles.secondaryButton} onPress={() => reopenInquiry(item.id)}>
-                  <Text style={styles.secondaryButtonText}>未対応に戻す</Text>
-                </TouchableOpacity>
-              ) : (
-                <TouchableOpacity style={styles.primaryButton} onPress={() => closeInquiry(item.id)}>
-                  <Text style={styles.primaryButtonText}>対応済みにする</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          ))
+            );
+          })
         )}
       </ScrollView>
     </SafeAreaView>
@@ -164,8 +242,18 @@ type StatusButtonProps = {
 
 function StatusButton({ label, active, onPress }: StatusButtonProps) {
   return (
-    <TouchableOpacity style={[styles.statusButton, active && styles.statusButtonActive]} onPress={onPress}>
-      <Text style={[styles.statusButtonText, active && styles.statusButtonTextActive]}>{label}</Text>
+    <TouchableOpacity
+      style={[styles.statusButton, active && styles.statusButtonActive]}
+      onPress={onPress}
+    >
+      <Text
+        style={[
+          styles.statusButtonText,
+          active && styles.statusButtonTextActive,
+        ]}
+      >
+        {label}
+      </Text>
     </TouchableOpacity>
   );
 }
