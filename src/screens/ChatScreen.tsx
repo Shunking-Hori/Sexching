@@ -33,10 +33,7 @@ export function ChatScreen({ user, onBack }: Props) {
   useEffect(() => {
     loadMessages();
 
-    const interval = setInterval(() => {
-      loadMessages();
-    }, 3000);
-
+    const interval = setInterval(loadMessages, 3000);
     return () => clearInterval(interval);
   }, []);
 
@@ -191,7 +188,9 @@ export function ChatScreen({ user, onBack }: Props) {
               value={messageText}
               onChangeText={setMessageText}
               placeholder="メッセージを入力"
-              multiline
+              multiline={false}
+              returnKeyType="send"
+              onSubmitEditing={sendMessage}
             />
 
             <TouchableOpacity
@@ -215,7 +214,6 @@ const colors = {
   background: '#fff7f5',
   card: '#ffffff',
   primary: '#8f2d56',
-  accent: '#f4d4dc',
   text: '#2b2226',
   subText: '#75666c',
   border: '#ead9de',
@@ -225,9 +223,9 @@ const colors = {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
     width: '100%',
-    minWidth: '100%',
+    minHeight: '100%',
+    backgroundColor: colors.background,
     alignItems: 'center',
   },
   screen: {
@@ -237,7 +235,7 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     paddingHorizontal: 16,
     paddingTop: 18,
-    paddingBottom: 14,
+    paddingBottom: 12,
   },
   header: {
     flexDirection: 'row',
@@ -264,13 +262,14 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   title: {
-    fontSize: 26,
+    fontSize: 24,
     fontWeight: '800',
     color: colors.text,
-    marginBottom: 14,
+    marginBottom: 12,
   },
   chatArea: {
     flex: 1,
+    minHeight: 420,
     backgroundColor: colors.card,
     borderRadius: 22,
     borderWidth: 1,
@@ -283,12 +282,12 @@ const styles = StyleSheet.create({
   },
   messageListContent: {
     padding: 14,
-    paddingBottom: 24,
+    paddingBottom: 20,
   },
   emptyArea: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 80,
+    paddingVertical: 70,
   },
   emptyText: {
     fontSize: 16,
@@ -355,25 +354,22 @@ const styles = StyleSheet.create({
     backgroundColor: colors.card,
     borderTopWidth: 1,
     borderTopColor: colors.border,
-    alignItems: 'flex-end',
+    alignItems: 'center',
   },
   input: {
     flex: 1,
-    minHeight: 50,
-    maxHeight: 110,
+    height: 48,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: 16,
     paddingHorizontal: 14,
-    paddingVertical: 12,
     backgroundColor: colors.background,
     fontSize: 15,
     color: colors.text,
-    textAlignVertical: 'top',
   },
   sendButton: {
     width: 62,
-    minHeight: 50,
+    height: 48,
     borderRadius: 16,
     backgroundColor: colors.primary,
     justifyContent: 'center',
