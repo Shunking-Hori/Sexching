@@ -267,7 +267,7 @@ export function ProfileScreen({ onComplete }: Props) {
             style={styles.input}
             value={nickname}
             onChangeText={setNickname}
-            placeholder="例：しゅー"
+            placeholder="例：はるちゃん"
           />
 
           <Text style={styles.label}>性別</Text>
