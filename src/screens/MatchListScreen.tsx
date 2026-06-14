@@ -43,6 +43,7 @@ export function MatchListScreen({ onSelectUser }: Props) {
   const [likedUserIds, setLikedUserIds] = useState<string[]>([]);
   const [myUserId, setMyUserId] = useState<string | null>(null);
   const [todayLikeCount, setTodayLikeCount] = useState(0);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
 
   const [prefectureFilter, setPrefectureFilter] = useState('');
@@ -120,6 +121,16 @@ export function MatchListScreen({ onSelectUser }: Props) {
     setTodayLikeCount(count || 0);
   };
 
+  const checkIsAdmin = async (userId: string) => {
+    const { data } = await supabase
+      .from('admins')
+      .select('id')
+      .eq('id', userId)
+      .maybeSingle();
+
+    return Boolean(data);
+  };
+
   const loadUsers = async () => {
     setIsInitialLoading(true);
 
@@ -133,7 +144,15 @@ export function MatchListScreen({ onSelectUser }: Props) {
     }
 
     setMyUserId(user.id);
-    await loadTodayLikeCount(user.id);
+
+    const admin = await checkIsAdmin(user.id);
+    setIsAdmin(admin);
+
+    if (admin) {
+      setTodayLikeCount(0);
+    } else {
+      await loadTodayLikeCount(user.id);
+    }
 
     const { data: myProfile, error: myProfileError } = await supabase
       .from('profiles')
@@ -252,7 +271,7 @@ export function MatchListScreen({ onSelectUser }: Props) {
 
     if (likedUserIds.includes(toUserId)) return;
 
-    if (todayLikeCount >= DAILY_LIKE_LIMIT) {
+    if (!isAdmin && todayLikeCount >= DAILY_LIKE_LIMIT) {
       alert('本日のいいね上限に達しました。いいねは1日10回までです。');
       return;
     }
@@ -282,7 +301,10 @@ export function MatchListScreen({ onSelectUser }: Props) {
     }
 
     setLikedUserIds([...likedUserIds, toUserId]);
-    setTodayLikeCount(todayLikeCount + 1);
+
+    if (!isAdmin) {
+      setTodayLikeCount(todayLikeCount + 1);
+    }
   };
 
   const resetFilters = () => {
@@ -351,7 +373,9 @@ export function MatchListScreen({ onSelectUser }: Props) {
 
       <View style={styles.limitCard}>
         <Text style={styles.limitText}>
-          本日のいいね：{todayLikeCount}/{DAILY_LIKE_LIMIT}
+          {isAdmin
+            ? '管理者：いいね無制限'
+            : `本日のいいね：${todayLikeCount}/${DAILY_LIKE_LIMIT}`}
         </Text>
       </View>
 
@@ -421,7 +445,7 @@ export function MatchListScreen({ onSelectUser }: Props) {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.listContent}>
         {filteredUsers.map((user) => {
           const isLiked = likedUserIds.includes(user.id);
-          const isLimitReached = todayLikeCount >= DAILY_LIKE_LIMIT;
+          const isLimitReached = !isAdmin && todayLikeCount >= DAILY_LIKE_LIMIT;
 
           return (
             <TouchableOpacity

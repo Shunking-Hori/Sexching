@@ -17,6 +17,8 @@ type Props = {
   onBack: () => void;
 };
 
+const DAILY_LIKE_LIMIT = 10;
+
 const reportReasons = [
   '不適切なプロフィール',
   '迷惑行為',
@@ -37,6 +39,16 @@ export function ProfileDetailScreen({ user, onBack }: Props) {
         ? [user.photoUrl]
         : [];
 
+  const checkIsAdmin = async (userId: string) => {
+    const { data } = await supabase
+      .from('admins')
+      .select('id')
+      .eq('id', userId)
+      .maybeSingle();
+
+    return Boolean(data);
+  };
+
   const sendLike = async () => {
     if (isLiked || isSending) return;
 
@@ -51,6 +63,8 @@ export function ProfileDetailScreen({ user, onBack }: Props) {
       setIsSending(false);
       return;
     }
+
+    const isAdmin = await checkIsAdmin(currentUser.id);
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -67,7 +81,7 @@ export function ProfileDetailScreen({ user, onBack }: Props) {
       return;
     }
 
-    if ((count || 0) >= 10) {
+    if (!isAdmin && (count || 0) >= DAILY_LIKE_LIMIT) {
       Alert.alert('上限に達しました', 'いいねは1日10回までです。');
       setIsSending(false);
       return;
@@ -351,10 +365,8 @@ const styles = StyleSheet.create({
     borderWidth: 3,
     borderColor: colors.primary,
   },
-  photoText: {
-    fontSize: 80,
-    fontWeight: '800',
-    color: colors.primary,
+  photoIcon: {
+    fontSize: 96,
   },
   name: {
     fontSize: 30,
@@ -443,8 +455,5 @@ const styles = StyleSheet.create({
   reportButtonText: {
     color: '#fff',
     fontWeight: '800',
-  },
-  photoIcon: {
-  fontSize: 96,
   },
 });
