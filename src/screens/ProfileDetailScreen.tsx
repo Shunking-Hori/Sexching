@@ -38,75 +38,70 @@ export function ProfileDetailScreen({ user, onBack }: Props) {
         : [];
 
   const sendLike = async () => {
-  if (isLiked || isSending) {
-    return;
-  }
+    if (isLiked || isSending) return;
 
-  setIsSending(true);
+    setIsSending(true);
 
-  const {
-    data: { user: currentUser },
-  } = await supabase.auth.getUser();
+    const {
+      data: { user: currentUser },
+    } = await supabase.auth.getUser();
 
-  if (!currentUser) {
-    alert('ログイン情報を取得できませんでした。');
+    if (!currentUser) {
+      Alert.alert('エラー', 'ログイン情報を取得できませんでした。');
+      setIsSending(false);
+      return;
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const { count, error: countError } = await supabase
+      .from('likes')
+      .select('id', { count: 'exact', head: true })
+      .eq('from_user', currentUser.id)
+      .gte('created_at', today.toISOString());
+
+    if (countError) {
+      Alert.alert('エラー', countError.message);
+      setIsSending(false);
+      return;
+    }
+
+    if ((count || 0) >= 10) {
+      Alert.alert('上限に達しました', 'いいねは1日10回までです。');
+      setIsSending(false);
+      return;
+    }
+
+    const { data: block } = await supabase
+      .from('blocks')
+      .select('id')
+      .or(
+        `and(from_user.eq.${currentUser.id},to_user.eq.${user.id}),and(from_user.eq.${user.id},to_user.eq.${currentUser.id})`
+      )
+      .maybeSingle();
+
+    if (block) {
+      Alert.alert('エラー', 'このユーザーにはいいねできません。');
+      setIsSending(false);
+      return;
+    }
+
+    const { error } = await supabase.from('likes').insert({
+      from_user: currentUser.id,
+      to_user: user.id,
+      status: 'pending',
+    });
+
     setIsSending(false);
-    return;
-  }
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+    if (error) {
+      Alert.alert('エラー', error.message);
+      return;
+    }
 
-  const { count, error: countError } = await supabase
-    .from('likes')
-    .select('id', {
-      count: 'exact',
-      head: true,
-    })
-    .eq('from_user', currentUser.id)
-    .gte('created_at', today.toISOString());
-
-  if (countError) {
-    alert(countError.message);
-    setIsSending(false);
-    return;
-  }
-
-  if ((count || 0) >= 10) {
-    alert('本日のいいね上限に達しました。いいねは1日10回までです。');
-    setIsSending(false);
-    return;
-  }
-
-  const { data: block } = await supabase
-    .from('blocks')
-    .select('id')
-    .or(
-      `and(from_user.eq.${currentUser.id},to_user.eq.${user.id}),and(from_user.eq.${user.id},to_user.eq.${currentUser.id})`
-    )
-    .maybeSingle();
-
-  if (block) {
-    alert('このユーザーにはいいねできません。');
-    setIsSending(false);
-    return;
-  }
-
-  const { error } = await supabase.from('likes').insert({
-    from_user: currentUser.id,
-    to_user: user.id,
-    status: 'pending',
-  });
-
-  setIsSending(false);
-
-  if (error) {
-    alert(error.message);
-    return;
-  }
-
-  setIsLiked(true);
-};
+    setIsLiked(true);
+  };
 
   const blockUser = async () => {
     const {
@@ -114,7 +109,7 @@ export function ProfileDetailScreen({ user, onBack }: Props) {
     } = await supabase.auth.getUser();
 
     if (!currentUser) {
-      alert('ログイン情報を取得できませんでした。');
+      Alert.alert('エラー', 'ログイン情報を取得できませんでした。');
       return;
     }
 
@@ -130,7 +125,7 @@ export function ProfileDetailScreen({ user, onBack }: Props) {
           });
 
           if (error) {
-            alert(error.message);
+            Alert.alert('エラー', error.message);
             return;
           }
 
@@ -146,7 +141,7 @@ export function ProfileDetailScreen({ user, onBack }: Props) {
     } = await supabase.auth.getUser();
 
     if (!currentUser) {
-      alert('ログイン情報を取得できませんでした。');
+      Alert.alert('エラー', 'ログイン情報を取得できませんでした。');
       return;
     }
 
@@ -158,132 +153,127 @@ export function ProfileDetailScreen({ user, onBack }: Props) {
     });
 
     if (error) {
-      alert(error.message);
+      Alert.alert('エラー', error.message);
       return;
     }
 
+    Alert.alert('通報しました', '内容を確認します。');
   };
 
   const reportUser = () => {
-    Alert.alert(
-      '通報理由を選択',
-      '該当する理由を選んでください。',
-      [
-        ...reportReasons.map((reason) => ({
-          text: reason,
-          onPress: () => reportUserWithReason(reason),
-        })),
-        { text: 'キャンセル', style: 'cancel' as const },
-      ]
-    );
+    Alert.alert('通報理由を選択', '該当する理由を選んでください。', [
+      ...reportReasons.map((reason) => ({
+        text: reason,
+        onPress: () => reportUserWithReason(reason),
+      })),
+      { text: 'キャンセル', style: 'cancel' as const },
+    ]);
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.content}>
-        <TouchableOpacity style={styles.backButton} onPress={onBack}>
-          <Text style={styles.backButtonText}>← 戻る</Text>
-        </TouchableOpacity>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <View style={styles.detailCard}>
+          <TouchableOpacity style={styles.backButton} onPress={onBack}>
+            <Text style={styles.backButtonText}>← 戻る</Text>
+          </TouchableOpacity>
 
-        {photoUrls.length > 0 ? (
-          <>
-            <Image
-              source={{ uri: photoUrls[selectedPhotoIndex] }}
-              style={styles.photoAreaImage}
-            />
+          {photoUrls.length > 0 ? (
+            <>
+              <Image
+                source={{ uri: photoUrls[selectedPhotoIndex] }}
+                style={styles.photoAreaImage}
+              />
 
-            {photoUrls.length > 1 && (
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                style={styles.thumbnailRow}
-              >
-                {photoUrls.map((url, index) => (
-                  <TouchableOpacity
-                    key={url}
-                    onPress={() => setSelectedPhotoIndex(index)}
-                  >
-                    <Image
-                      source={{ uri: url }}
-                      style={[
-                        styles.thumbnailImage,
-                        selectedPhotoIndex === index &&
-                          styles.thumbnailImageActive,
-                      ]}
-                    />
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            )}
-          </>
-        ) : (
-          <View style={styles.photoArea}>
-            <Text style={styles.photoText}>{user.name.substring(0, 1)}</Text>
-          </View>
-        )}
+              {photoUrls.length > 1 && (
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  style={styles.thumbnailRow}
+                >
+                  {photoUrls.map((url, index) => (
+                    <TouchableOpacity key={url} onPress={() => setSelectedPhotoIndex(index)}>
+                      <Image
+                        source={{ uri: url }}
+                        style={[
+                          styles.thumbnailImage,
+                          selectedPhotoIndex === index && styles.thumbnailImageActive,
+                        ]}
+                      />
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              )}
+            </>
+          ) : (
+            <View style={styles.photoArea}>
+              <Text style={styles.photoIcon}>👤</Text>
+            </View>
+          )}
 
-        <Text style={styles.name}>
-          {user.name} / {user.age ? `${user.age}` : '年齢未設定'}
-        </Text>
-
-        <Text style={styles.prefecture}>
-          {user.gender} / {user.prefecture}
-        </Text>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>自己紹介</Text>
-          <Text style={styles.bodyText}>{user.profile}</Text>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>趣味</Text>
-          <View style={styles.tagRow}>
-            {user.hobbies.length > 0 ? (
-              user.hobbies.map((hobby) => (
-                <View key={hobby} style={styles.tag}>
-                  <Text style={styles.tagText}>{hobby}</Text>
-                </View>
-              ))
-            ) : (
-              <Text style={styles.bodyText}>未設定</Text>
-            )}
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>休日の過ごし方</Text>
-          <Text style={styles.bodyText}>{user.holiday}</Text>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>仕事</Text>
-          <Text style={styles.bodyText}>{user.job}</Text>
-        </View>
-
-        {user.gender === '女性' && user.bustSize && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>バストサイズ</Text>
-            <Text style={styles.bodyText}>{user.bustSize}</Text>
-          </View>
-        )}
-
-        <TouchableOpacity
-          style={[styles.likeButton, isLiked && styles.likeButtonLiked]}
-          onPress={sendLike}
-          disabled={isLiked || isSending}
-        >
-          <Text style={styles.likeButtonText}>
-            {isLiked ? '承認待ち' : isSending ? '送信中...' : '♡ いいねする'}
+          <Text style={styles.name}>
+            {user.name} / {user.age ? `${user.age}` : '年齢未設定'}
           </Text>
-        </TouchableOpacity>
 
-        <TouchableOpacity style={styles.blockButton} onPress={blockUser}>
-          <Text style={styles.blockButtonText}>🚫 ブロック</Text>
-        </TouchableOpacity>
+          <Text style={styles.prefecture}>
+            {user.gender} / {user.prefecture}
+          </Text>
 
-        <TouchableOpacity style={styles.reportButton} onPress={reportUser}>
-          <Text style={styles.reportButtonText}>⚠️ 通報</Text>
-        </TouchableOpacity>
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>自己紹介</Text>
+            <Text style={styles.bodyText}>{user.profile || '自己紹介はまだありません。'}</Text>
+          </View>
+
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>趣味</Text>
+            <View style={styles.tagRow}>
+              {user.hobbies.length > 0 ? (
+                user.hobbies.map((hobby) => (
+                  <View key={hobby} style={styles.tag}>
+                    <Text style={styles.tagText}>{hobby}</Text>
+                  </View>
+                ))
+              ) : (
+                <Text style={styles.bodyText}>未設定</Text>
+              )}
+            </View>
+          </View>
+
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>休日の過ごし方</Text>
+            <Text style={styles.bodyText}>{user.holiday || '未設定'}</Text>
+          </View>
+
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>仕事</Text>
+            <Text style={styles.bodyText}>{user.job || '未設定'}</Text>
+          </View>
+
+          {user.gender === '女性' && user.bustSize && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>バストサイズ</Text>
+              <Text style={styles.bodyText}>{user.bustSize}</Text>
+            </View>
+          )}
+
+          <TouchableOpacity
+            style={[styles.likeButton, isLiked && styles.likeButtonLiked]}
+            onPress={sendLike}
+            disabled={isLiked || isSending}
+          >
+            <Text style={styles.likeButtonText}>
+              {isLiked ? '承認待ち' : isSending ? '送信中...' : '♡ いいねする'}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.blockButton} onPress={blockUser}>
+            <Text style={styles.blockButtonText}>🚫 ブロック</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.reportButton} onPress={reportUser}>
+            <Text style={styles.reportButtonText}>⚠️ 通報</Text>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -307,16 +297,22 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
     width: '100%',
-    maxWidth: 560,
-    alignSelf: 'center',
   },
   content: {
-    padding: 20,
-    paddingBottom: 50,
+    flexGrow: 1,
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingTop: 18,
+    paddingBottom: 56,
+  },
+  detailCard: {
+    width: '100%',
+    maxWidth: 520,
+    alignSelf: 'center',
   },
   backButton: {
     alignSelf: 'flex-start',
-    marginBottom: 14,
+    marginBottom: 16,
   },
   backButtonText: {
     color: colors.primary,
@@ -324,17 +320,21 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   photoArea: {
-    height: 280,
+    width: '100%',
+    height: 360,
     borderRadius: 28,
     backgroundColor: colors.accent,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 20,
+    overflow: 'hidden',
   },
   photoAreaImage: {
-    height: 280,
+    width: '100%',
+    height: 360,
     borderRadius: 28,
     marginBottom: 12,
+    resizeMode: 'cover',
   },
   thumbnailRow: {
     marginBottom: 18,
@@ -376,6 +376,7 @@ const styles = StyleSheet.create({
     marginBottom: 14,
     borderWidth: 1,
     borderColor: colors.border,
+    width: '100%',
   },
   sectionTitle: {
     fontSize: 16,
@@ -409,6 +410,7 @@ const styles = StyleSheet.create({
     paddingVertical: 17,
     alignItems: 'center',
     marginTop: 16,
+    width: '100%',
   },
   likeButtonLiked: {
     backgroundColor: colors.likedGray,
@@ -424,6 +426,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     backgroundColor: colors.block,
     alignItems: 'center',
+    width: '100%',
   },
   blockButtonText: {
     color: '#fff',
@@ -435,9 +438,13 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     backgroundColor: colors.danger,
     alignItems: 'center',
+    width: '100%',
   },
   reportButtonText: {
     color: '#fff',
     fontWeight: '800',
+  },
+  photoIcon: {
+  fontSize: 96,
   },
 });

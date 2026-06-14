@@ -394,9 +394,7 @@ export function MatchListScreen({ onSelectUser }: Props) {
                 />
               ) : (
                 <View style={styles.avatar}>
-                  <Text style={styles.avatarText}>
-                    {user.name.substring(0, 1)}
-                  </Text>
+                  <Text style={styles.avatarIcon}>👤</Text>
                 </View>
               )}
 
@@ -467,6 +465,9 @@ const styles = StyleSheet.create({
     color: colors.subText,
     marginTop: 6,
     marginBottom: 12,
+  },
+  avatarIcon: {
+  fontSize: 38,
   },
   limitCard: {
     backgroundColor: colors.card,
