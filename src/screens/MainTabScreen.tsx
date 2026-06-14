@@ -104,8 +104,19 @@ export function MainTabScreen({ onLogout }: Props) {
   if (chatPartner) {
     return (
       <ChatScreen
-        partnerId={chatPartner.id}
-        partnerName={chatPartner.name}
+        user={{
+          id: chatPartner.id,
+          name: chatPartner.name,
+          age: 0,
+          gender: '',
+          prefecture: '',
+          profile: '',
+          photoUrl: null,
+          photoUrls: [],
+          hobbies: [],
+          holiday: '',
+          job: '',
+        }}
         onBack={closeChat}
       />
     );
