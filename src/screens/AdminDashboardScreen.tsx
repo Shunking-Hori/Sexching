@@ -24,6 +24,8 @@ type CountCardProps = {
   description: string;
 };
 
+const EXCLUDED_ADMIN_MEMOS = ['sample_user', 'Admin_User'];
+
 export function AdminDashboardScreen() {
   const [counts, setCounts] = useState<DashboardCounts>({
     profiles: 0,
@@ -44,51 +46,115 @@ export function AdminDashboardScreen() {
     return () => clearInterval(interval);
   }, []);
 
-  const countRows = async (tableName: string, filter?: (query: any) => any) => {
-    let query = supabase
-      .from(tableName)
-      .select('id', { count: 'exact', head: true });
+  const isExcludedMemo = (adminMemo: string | null | undefined) => {
+    return EXCLUDED_ADMIN_MEMOS.includes(adminMemo || '');
+  };
 
-    if (filter) {
-      query = filter(query);
-    }
-
-    const { count, error } = await query;
-
-    if (error) {
-      console.log(`${tableName} count error`, error.message);
-      return 0;
-    }
-
-    return count || 0;
+  const isRealUserId = (userId: string | null | undefined, realUserIds: Set<string>) => {
+    return Boolean(userId && realUserIds.has(userId));
   };
 
   const loadDashboard = async () => {
     setIsLoading(true);
 
+    const { data: profiles, error: profileError } = await supabase
+      .from('profiles')
+      .select('id, admin_memo');
+
+    if (profileError) {
+      alert(profileError.message);
+      setIsLoading(false);
+      return;
+    }
+
+    const realProfiles = (profiles || []).filter(
+      (profile) => !isExcludedMemo(profile.admin_memo)
+    );
+
+    const realUserIds = new Set(realProfiles.map((profile) => profile.id));
+
     const [
-      profileCount,
-      likeCount,
-      matchCount,
-      messageCount,
-      reportCount,
-      inquiryCount,
+      likeResult,
+      messageResult,
+      reportResult,
+      inquiryResult,
     ] = await Promise.all([
-      countRows('profiles'),
-      countRows('likes'),
-      countRows('likes', (query) => query.eq('is_match', true)),
-      countRows('messages'),
-      countRows('reports'),
-      countRows('inquiries'),
+      supabase
+        .from('likes')
+        .select('id, from_user, to_user, is_match'),
+
+      supabase
+        .from('messages')
+        .select('id, sender_id, receiver_id'),
+
+      supabase
+        .from('reports')
+        .select('id, reporter_id, reported_user_id'),
+
+      supabase
+        .from('inquiries')
+        .select('id, user_id'),
     ]);
 
+    if (likeResult.error) {
+      alert(likeResult.error.message);
+      setIsLoading(false);
+      return;
+    }
+
+    if (messageResult.error) {
+      alert(messageResult.error.message);
+      setIsLoading(false);
+      return;
+    }
+
+    if (reportResult.error) {
+      alert(reportResult.error.message);
+      setIsLoading(false);
+      return;
+    }
+
+    if (inquiryResult.error) {
+      alert(inquiryResult.error.message);
+      setIsLoading(false);
+      return;
+    }
+
+    const realLikes = (likeResult.data || []).filter(
+      (like) =>
+        isRealUserId(like.from_user, realUserIds) &&
+        isRealUserId(like.to_user, realUserIds)
+    );
+
+    const realMatches = realLikes.filter((like) => like.is_match === true);
+
+    const realMessages = (messageResult.data || []).filter(
+      (message) =>
+        isRealUserId(message.sender_id, realUserIds) &&
+        isRealUserId(message.receiver_id, realUserIds)
+    );
+
+    const realReports = (reportResult.data || []).filter((report) => {
+      const reporterIsReal =
+        !report.reporter_id || isRealUserId(report.reporter_id, realUserIds);
+      const reportedUserIsReal =
+        !report.reported_user_id ||
+        isRealUserId(report.reported_user_id, realUserIds);
+
+      return reporterIsReal && reportedUserIsReal;
+    });
+
+    const realInquiries = (inquiryResult.data || []).filter((inquiry) => {
+      return !inquiry.user_id || isRealUserId(inquiry.user_id, realUserIds);
+    });
+
     setCounts({
-      profiles: profileCount,
-      likes: likeCount,
-      matches: matchCount,
-      messages: messageCount,
-      reports: reportCount,
-      inquiries: inquiryCount,
+      profiles: realProfiles.length,
+      likes: realLikes.length,
+      matches: realMatches.length,
+      messages: realMessages.length,
+      reports: realReports.length,
+      inquiries: realInquiries.length,
     });
 
     setLastUpdatedText(
@@ -111,7 +177,7 @@ export function AdminDashboardScreen() {
         <View style={styles.header}>
           <View>
             <Text style={styles.title}>ダッシュボード</Text>
-            <Text style={styles.subtitle}>アプリの利用状況を確認できます</Text>
+            <Text style={styles.subtitle}>サンプルユーザーを除いた利用状況です</Text>
           </View>
 
           <TouchableOpacity style={styles.refreshButton} onPress={loadDashboard}>
@@ -128,43 +194,46 @@ export function AdminDashboardScreen() {
               ? `最終更新：${lastUpdatedText}`
               : 'データを取得しています'}
           </Text>
+          <Text style={styles.excludeText}>
+            除外条件：profiles.admin_memo が sample_user / Admin_User のユーザー
+          </Text>
         </View>
 
         <View style={styles.cardGrid}>
           <CountCard
             label="登録者数"
             value={counts.profiles}
-            description="プロフィール作成済みユーザー"
+            description="サンプル・管理者を除くプロフィール作成済みユーザー"
           />
 
           <CountCard
             label="いいね数"
             value={counts.likes}
-            description="送信されたいいねの総数"
+            description="実ユーザー同士で送信されたいいねの総数"
           />
 
           <CountCard
             label="マッチ数"
             value={counts.matches}
-            description="成立したマッチの総数"
+            description="実ユーザー同士で成立したマッチの総数"
           />
 
           <CountCard
             label="メッセージ数"
             value={counts.messages}
-            description="送信されたメッセージの総数"
+            description="実ユーザー同士で送信されたメッセージの総数"
           />
 
           <CountCard
             label="通報数"
             value={counts.reports}
-            description="ユーザーからの通報件数"
+            description="サンプル・管理者を除いた通報件数"
           />
 
           <CountCard
             label="お問い合わせ数"
             value={counts.inquiries}
-            description="問い合わせフォームの件数"
+            description="サンプル・管理者を除いた問い合わせ件数"
           />
         </View>
 
@@ -172,7 +241,7 @@ export function AdminDashboardScreen() {
           <Text style={styles.memoTitle}>見るべきポイント</Text>
           <Text style={styles.memoText}>
             まずは「登録者数 → いいね数 → マッチ数 → メッセージ数」の順に落ち込みを確認してください。
-            どこで数字が落ちているかを見ると、次に改善すべき場所が分かります。
+            ここでは admin_memo が sample_user / Admin_User のデータを除外しています。
           </Text>
         </View>
       </ScrollView>
@@ -261,6 +330,12 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.subText,
     marginTop: 6,
+  },
+  excludeText: {
+    fontSize: 12,
+    color: colors.subText,
+    marginTop: 8,
+    lineHeight: 18,
   },
   cardGrid: {
     flexDirection: 'row',
