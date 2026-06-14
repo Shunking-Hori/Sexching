@@ -89,12 +89,7 @@ export function AdminInquiriesScreen() {
   };
 
   const closeInquiry = async (id: number) => {
-    const shouldClose = await confirmAction(
-      'このお問い合わせを対応済みにしますか？'
-    );
-
-    if (!shouldClose) return;
-
+  
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -117,11 +112,6 @@ export function AdminInquiriesScreen() {
   };
 
   const reopenInquiry = async (id: number) => {
-    const shouldReopen = await confirmAction(
-      'このお問い合わせを未対応に戻しますか？'
-    );
-
-    if (!shouldReopen) return;
 
     const { error } = await supabase
       .from('inquiries')
