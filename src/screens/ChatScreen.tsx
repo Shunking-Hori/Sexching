@@ -22,7 +22,10 @@ type Message = {
   id: string;
   sender_id: string;
   receiver_id: string;
-  content: string;
+  content?: string | null;
+  message?: string | null;
+  body?: string | null;
+  text?: string | null;
   created_at: string;
   is_read: boolean;
 };
@@ -35,9 +38,11 @@ export function ChatScreen({ user, onBack }: Props) {
 
   useEffect(() => {
     loadMessages();
+
     const interval = setInterval(loadMessages, 3000);
+
     return () => clearInterval(interval);
-  }, []);
+  }, [user?.id]);
 
   useEffect(() => {
     setTimeout(() => {
@@ -46,6 +51,8 @@ export function ChatScreen({ user, onBack }: Props) {
   }, [messages]);
 
   const loadMessages = async () => {
+    if (!user?.id) return;
+
     const {
       data: { user: currentUser },
     } = await supabase.auth.getUser();
@@ -78,12 +85,14 @@ export function ChatScreen({ user, onBack }: Props) {
   };
 
   const sendMessage = async () => {
-    if (!myUserId || !messageText.trim()) return;
+    if (!user?.id || !myUserId || !messageText.trim()) return;
+
+    const text = messageText.trim();
 
     const { error } = await supabase.from('messages').insert({
       sender_id: myUserId,
       receiver_id: user.id,
-      content: messageText.trim(),
+      content: text,
       is_read: false,
     });
 
@@ -93,18 +102,18 @@ export function ChatScreen({ user, onBack }: Props) {
     }
 
     setMessageText('');
-    loadMessages();
+    await loadMessages();
   };
 
   const blockUser = async () => {
-    if (!myUserId) return;
+    if (!user?.id || !myUserId) return;
 
     const { error } = await supabase.from('blocks').insert({
       from_user: myUserId,
       to_user: user.id,
     });
 
-    if (error) {
+    if (error && error.code !== '23505') {
       alert(error.message);
       return;
     }
@@ -115,11 +124,28 @@ export function ChatScreen({ user, onBack }: Props) {
 
   const formatTime = (dateText: string) => {
     const date = new Date(dateText);
+
     return date.toLocaleTimeString('ja-JP', {
       hour: '2-digit',
       minute: '2-digit',
     });
   };
+
+  if (!user?.id) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.screen}>
+          <TouchableOpacity onPress={onBack}>
+            <Text style={styles.backText}>← 戻る</Text>
+          </TouchableOpacity>
+
+          <View style={styles.emptyArea}>
+            <Text style={styles.emptyText}>ユーザー情報を取得できませんでした</Text>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -134,7 +160,7 @@ export function ChatScreen({ user, onBack }: Props) {
             </TouchableOpacity>
 
             <Text style={styles.title} numberOfLines={1}>
-              {user.name}
+              {user.name || 'ユーザー'}
             </Text>
 
             <TouchableOpacity style={styles.blockButton} onPress={blockUser}>
@@ -149,6 +175,9 @@ export function ChatScreen({ user, onBack }: Props) {
               contentContainerStyle={styles.messageListContent}
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
+              onContentSizeChange={() => {
+                scrollRef.current?.scrollToEnd({ animated: true });
+              }}
             >
               {messages.length === 0 ? (
                 <View style={styles.emptyArea}>
@@ -160,6 +189,13 @@ export function ChatScreen({ user, onBack }: Props) {
               ) : (
                 messages.map((message) => {
                   const isMine = message.sender_id === myUserId;
+
+                  const messageContent =
+                    message.content ||
+                    message.message ||
+                    message.body ||
+                    message.text ||
+                    '';
 
                   return (
                     <View
@@ -175,14 +211,18 @@ export function ChatScreen({ user, onBack }: Props) {
                           isMine ? styles.myBubble : styles.otherBubble,
                         ]}
                       >
-                        <Text
-                          style={[
-                            styles.messageText,
-                            isMine ? styles.myMessageText : styles.otherMessageText,
-                          ]}
-                        >
-                          {message.content}
-                        </Text>
+                        {!!messageContent && (
+                          <Text
+                            style={[
+                              styles.messageText,
+                              isMine
+                                ? styles.myMessageText
+                                : styles.otherMessageText,
+                            ]}
+                          >
+                            {messageContent}
+                          </Text>
+                        )}
 
                         <Text
                           style={[
@@ -206,6 +246,7 @@ export function ChatScreen({ user, onBack }: Props) {
                 value={messageText}
                 onChangeText={setMessageText}
                 placeholder="メッセージを入力"
+                placeholderTextColor={colors.subText}
                 multiline={false}
                 returnKeyType="send"
                 onSubmitEditing={sendMessage}
@@ -243,7 +284,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     width: '100%',
-    height: Platform.OS === 'web' ? '100vh' as any : '100%',
+    height: Platform.OS === 'web' ? ('100vh' as any) : '100%',
     backgroundColor: colors.background,
   },
   keyboardArea: {
