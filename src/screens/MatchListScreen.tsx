@@ -147,7 +147,10 @@ export function MatchListScreen({ onSelectUser }: Props) {
       return;
     }
 
-    const oppositeGender = myProfile.gender === '男性' ? '女性' : '男性';
+    const visibleGenders =
+      myProfile.gender === '男性'
+        ? ['女性']
+        : ['男性', '女性'];
 
     const { data: blocks, error: blocksError } = await supabase
       .from('blocks')
@@ -200,7 +203,7 @@ export function MatchListScreen({ onSelectUser }: Props) {
       .select('*')
       .neq('id', user.id)
       .eq('is_banned', false)
-      .eq('gender', oppositeGender)
+      .in('gender', visibleGenders)
       .order('created_at', { ascending: false });
 
     if (profilesError) {
