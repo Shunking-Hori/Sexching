@@ -22,10 +22,7 @@ type Message = {
   id: string;
   sender_id: string;
   receiver_id: string;
-  content?: string | null;
-  message?: string | null;
-  body?: string | null;
-  text?: string | null;
+  message: string | null;
   created_at: string;
   is_read: boolean;
 };
@@ -63,7 +60,7 @@ export function ChatScreen({ user, onBack }: Props) {
 
     const { data, error } = await supabase
       .from('messages')
-      .select('*')
+      .select('id, sender_id, receiver_id, message, created_at, is_read')
       .or(
         `and(sender_id.eq.${currentUser.id},receiver_id.eq.${user.id}),and(sender_id.eq.${user.id},receiver_id.eq.${currentUser.id})`
       )
@@ -92,7 +89,7 @@ export function ChatScreen({ user, onBack }: Props) {
     const { error } = await supabase.from('messages').insert({
       sender_id: myUserId,
       receiver_id: user.id,
-      content: text,
+      message: text,
       is_read: false,
     });
 
@@ -190,13 +187,6 @@ export function ChatScreen({ user, onBack }: Props) {
                 messages.map((message) => {
                   const isMine = message.sender_id === myUserId;
 
-                  const messageContent =
-                    message.content ||
-                    message.message ||
-                    message.body ||
-                    message.text ||
-                    '';
-
                   return (
                     <View
                       key={message.id}
@@ -211,18 +201,16 @@ export function ChatScreen({ user, onBack }: Props) {
                           isMine ? styles.myBubble : styles.otherBubble,
                         ]}
                       >
-                        {!!messageContent && (
-                          <Text
-                            style={[
-                              styles.messageText,
-                              isMine
-                                ? styles.myMessageText
-                                : styles.otherMessageText,
-                            ]}
-                          >
-                            {messageContent}
-                          </Text>
-                        )}
+                        <Text
+                          style={[
+                            styles.messageText,
+                            isMine
+                              ? styles.myMessageText
+                              : styles.otherMessageText,
+                          ]}
+                        >
+                          {message.message || ''}
+                        </Text>
 
                         <Text
                           style={[
