@@ -49,6 +49,7 @@ export function MatchListScreen({ onSelectUser }: Props) {
   const [minAge, setMinAge] = useState('');
   const [maxAge, setMaxAge] = useState('');
   const [openDropdown, setOpenDropdown] = useState<DropdownType>(null);
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
 
   useEffect(() => {
     loadUsers();
@@ -193,7 +194,9 @@ export function MatchListScreen({ onSelectUser }: Props) {
       }
 
       if (like.is_match) {
-        matchedUserIds.add(like.from_user === user.id ? like.to_user : like.from_user);
+        matchedUserIds.add(
+          like.from_user === user.id ? like.to_user : like.from_user
+        );
       }
     });
 
@@ -230,6 +233,20 @@ export function MatchListScreen({ onSelectUser }: Props) {
       return true;
     });
   }, [users, prefectureFilter, minAge, maxAge]);
+
+  const filterSummary = useMemo(() => {
+    const conditions: string[] = [];
+
+    if (minAge || maxAge) {
+      conditions.push(`${minAge || '18'}〜${maxAge || '80'}歳`);
+    }
+
+    if (prefectureFilter) {
+      conditions.push(prefectureFilter);
+    }
+
+    return conditions.length > 0 ? conditions.join(' / ') : '指定なし';
+  }, [minAge, maxAge, prefectureFilter]);
 
   const sendLike = async (toUserId: string) => {
     if (!myUserId) {
@@ -343,25 +360,51 @@ export function MatchListScreen({ onSelectUser }: Props) {
       </View>
 
       <View style={styles.filterCard}>
-        <Text style={styles.filterTitle}>検索条件</Text>
-
-        <Text style={styles.filterLabel}>年齢</Text>
-        <View style={styles.ageRow}>
-          <View style={styles.ageDropdownBox}>
-            {renderDropdown('minAge', minAge, '最小', AGE_OPTIONS, setMinAge, 170)}
+        <TouchableOpacity
+          style={styles.filterHeader}
+          activeOpacity={0.85}
+          onPress={() => {
+            setIsFilterOpen(!isFilterOpen);
+            setOpenDropdown(null);
+          }}
+        >
+          <View style={styles.filterHeaderTextArea}>
+            <Text style={styles.filterTitle}>検索条件</Text>
+            <Text style={styles.filterSummary}>{filterSummary}</Text>
           </View>
-          <Text style={styles.ageSeparator}>〜</Text>
-          <View style={styles.ageDropdownBox}>
-            {renderDropdown('maxAge', maxAge, '最大', AGE_OPTIONS, setMaxAge, 170)}
-          </View>
-        </View>
 
-        <Text style={styles.filterLabel}>都道府県</Text>
-        {renderDropdown('prefecture', prefectureFilter, '都道府県を選択', prefectures, setPrefectureFilter)}
-
-        <TouchableOpacity style={styles.resetButton} onPress={resetFilters}>
-          <Text style={styles.resetButtonText}>条件をリセット</Text>
+          <Text style={styles.filterToggle}>
+            {isFilterOpen ? '閉じる ▲' : '開く ▼'}
+          </Text>
         </TouchableOpacity>
+
+        {isFilterOpen && (
+          <View style={styles.filterBody}>
+            <Text style={styles.filterLabel}>年齢</Text>
+            <View style={styles.ageRow}>
+              <View style={styles.ageDropdownBox}>
+                {renderDropdown('minAge', minAge, '最小', AGE_OPTIONS, setMinAge, 170)}
+              </View>
+              <Text style={styles.ageSeparator}>〜</Text>
+              <View style={styles.ageDropdownBox}>
+                {renderDropdown('maxAge', maxAge, '最大', AGE_OPTIONS, setMaxAge, 170)}
+              </View>
+            </View>
+
+            <Text style={styles.filterLabel}>都道府県</Text>
+            {renderDropdown(
+              'prefecture',
+              prefectureFilter,
+              '都道府県を選択',
+              prefectures,
+              setPrefectureFilter
+            )}
+
+            <TouchableOpacity style={styles.resetButton} onPress={resetFilters}>
+              <Text style={styles.resetButtonText}>条件をリセット</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
 
       {isInitialLoading && <Text style={styles.infoText}>読み込み中...</Text>}
@@ -388,10 +431,7 @@ export function MatchListScreen({ onSelectUser }: Props) {
               onPress={() => onSelectUser(user)}
             >
               {user.photoUrl ? (
-                <Image
-                  source={{ uri: user.photoUrl }}
-                  style={styles.avatarImage}
-                />
+                <Image source={{ uri: user.photoUrl }} style={styles.avatarImage} />
               ) : (
                 <View style={styles.avatar}>
                   <Text style={styles.avatarIcon}>👤</Text>
@@ -466,9 +506,6 @@ const styles = StyleSheet.create({
     marginTop: 6,
     marginBottom: 12,
   },
-  avatarIcon: {
-  fontSize: 38,
-  },
   limitCard: {
     backgroundColor: colors.card,
     borderRadius: 14,
@@ -487,17 +524,42 @@ const styles = StyleSheet.create({
   filterCard: {
     backgroundColor: colors.card,
     borderRadius: 20,
-    padding: 16,
+    padding: 14,
     borderWidth: 1,
     borderColor: colors.border,
     marginBottom: 16,
     zIndex: 20,
   },
+  filterHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 12,
+  },
+  filterHeaderTextArea: {
+    flex: 1,
+  },
   filterTitle: {
     fontSize: 15,
     fontWeight: '800',
     color: colors.text,
-    marginBottom: 10,
+    marginBottom: 4,
+  },
+  filterSummary: {
+    fontSize: 12,
+    color: colors.subText,
+    fontWeight: '700',
+  },
+  filterToggle: {
+    color: colors.primary,
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  filterBody: {
+    marginTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    paddingTop: 10,
   },
   filterLabel: {
     fontSize: 12,
@@ -628,10 +690,8 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     marginBottom: 14,
   },
-  avatarText: {
-    fontSize: 30,
-    fontWeight: '800',
-    color: colors.primary,
+  avatarIcon: {
+    fontSize: 38,
   },
   name: {
     fontSize: 20,
