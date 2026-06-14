@@ -171,6 +171,7 @@ export function ProfileScreen({ onComplete }: Props) {
       hobbies: '',
       holiday: '',
       job: '',
+      is_banned: false,
     });
 
     setIsSaving(false);
@@ -199,7 +200,7 @@ export function ProfileScreen({ onComplete }: Props) {
           style={styles.dropdownButton}
           onPress={() => setOpenDropdown(isOpen ? null : type)}
         >
-          <Text style={[styles.dropdownText, !value && styles.placeholderText]}>
+          <Text style={[styles.dropdownText, !value && styles.placeholderText]} numberOfLines={1}>
             {value ? `${value}${suffix}` : label}
           </Text>
           <Text style={styles.dropdownArrow}>{isOpen ? '▲' : '▼'}</Text>
@@ -230,103 +231,114 @@ export function ProfileScreen({ onComplete }: Props) {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.formContainer}>
-        <Text style={styles.pageTitle}>プロフィール登録</Text>
-
-        <Text style={styles.pageSubTitle}>
-          あなたの雰囲気が伝わるように入力しましょう
-        </Text>
-
-        <Text style={styles.label}>プロフィール写真</Text>
-        <TouchableOpacity style={styles.photoPicker} onPress={pickImage}>
-          {photoUri ? (
-            <Image source={{ uri: photoUri }} style={styles.photoPreview} />
-          ) : (
-            <View style={styles.photoPlaceholder}>
-              <Text style={styles.photoIcon}>＋</Text>
-              <Text style={styles.photoText}>写真を選択</Text>
-            </View>
-          )}
-        </TouchableOpacity>
-
-        {photoUri && (
-          <TouchableOpacity style={styles.changePhotoButton} onPress={pickImage}>
-            <Text style={styles.changePhotoText}>写真を変更する</Text>
-          </TouchableOpacity>
-        )}
-
-        <Text style={styles.label}>ニックネーム</Text>
-        <TextInput
-          style={styles.input}
-          value={nickname}
-          onChangeText={setNickname}
-          placeholder="例：Shun"
-        />
-
-        <Text style={styles.label}>性別</Text>
-        <View style={styles.choiceRow}>
-          {['男性', '女性'].map((item) => (
-            <TouchableOpacity
-              key={item}
-              style={[
-                styles.choiceButton,
-                gender === item && styles.choiceButtonActive,
-              ]}
-              onPress={() => setGender(item)}
-            >
-              <Text
-                style={[
-                  styles.choiceText,
-                  gender === item && styles.choiceTextActive,
-                ]}
-              >
-                {item}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        <Text style={styles.label}>生年月日</Text>
-        <View style={styles.birthdayRow}>
-          {renderDropdown('year', '年', birthYear, years, setBirthYear, '年')}
-          {renderDropdown('month', '月', birthMonth, months, setBirthMonth, '月')}
-          {renderDropdown('day', '日', birthDay, days, setBirthDay, '日')}
-        </View>
-
-        {isBirthdayComplete && !isOver18 && (
-          <Text style={styles.errorText}>18歳未満の方は登録できません</Text>
-        )}
-
-        <Text style={styles.label}>居住地</Text>
-        {renderDropdown(
-          'prefecture',
-          '都道府県を選択',
-          prefecture,
-          prefectures,
-          setPrefecture
-        )}
-
-        <Text style={styles.label}>自己紹介</Text>
-        <TextInput
-          style={styles.profileInput}
-          multiline
-          value={profile}
-          onChangeText={setProfile}
-          placeholder="休日の過ごし方や、どんな出会いを探しているかを書いてみましょう"
-        />
-
-        <TouchableOpacity
-          style={[
-            styles.primaryButton,
-            !canSubmit && styles.primaryButtonDisabled,
-          ]}
-          onPress={saveProfile}
-          disabled={!canSubmit}
-        >
-          <Text style={styles.primaryButtonText}>
-            {isSaving ? '保存中...' : '登録してはじめる'}
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.formCard}>
+          <Text style={styles.pageTitle}>プロフィール登録</Text>
+          <Text style={styles.pageSubTitle}>
+            あなたの雰囲気が伝わるように入力しましょう
           </Text>
-        </TouchableOpacity>
+
+          <Text style={styles.label}>プロフィール写真</Text>
+
+          <TouchableOpacity style={styles.photoPicker} onPress={pickImage}>
+            {photoUri ? (
+              <Image source={{ uri: photoUri }} style={styles.photoPreview} />
+            ) : (
+              <View style={styles.photoPlaceholder}>
+                <Text style={styles.photoIcon}>＋</Text>
+                <Text style={styles.photoText}>写真を選択</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+
+          {photoUri && (
+            <TouchableOpacity style={styles.changePhotoButton} onPress={pickImage}>
+              <Text style={styles.changePhotoText}>写真を変更する</Text>
+            </TouchableOpacity>
+          )}
+
+          <Text style={styles.label}>ニックネーム</Text>
+          <TextInput
+            style={styles.input}
+            value={nickname}
+            onChangeText={setNickname}
+            placeholder="例：しゅー"
+          />
+
+          <Text style={styles.label}>性別</Text>
+          <View style={styles.choiceRow}>
+            {['男性', '女性'].map((item) => (
+              <TouchableOpacity
+                key={item}
+                style={[
+                  styles.choiceButton,
+                  gender === item && styles.choiceButtonActive,
+                ]}
+                onPress={() => setGender(item)}
+              >
+                <Text
+                  style={[
+                    styles.choiceText,
+                    gender === item && styles.choiceTextActive,
+                  ]}
+                >
+                  {item}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          <Text style={styles.label}>生年月日</Text>
+          <View style={styles.birthdayRow}>
+            {renderDropdown('year', '年', birthYear, years, setBirthYear, '年')}
+            {renderDropdown('month', '月', birthMonth, months, setBirthMonth, '月')}
+            {renderDropdown('day', '日', birthDay, days, setBirthDay, '日')}
+          </View>
+
+          {isBirthdayComplete && !isOver18 && (
+            <Text style={styles.errorText}>18歳未満の方は登録できません</Text>
+          )}
+
+          <Text style={styles.noticeText}>
+            ※性別・生年月日は登録後に変更できません。
+          </Text>
+
+          <Text style={styles.label}>居住地</Text>
+          {renderDropdown(
+            'prefecture',
+            '都道府県を選択',
+            prefecture,
+            prefectures,
+            setPrefecture
+          )}
+
+          <Text style={styles.label}>自己紹介</Text>
+          <TextInput
+            style={styles.profileInput}
+            multiline
+            value={profile}
+            onChangeText={setProfile}
+            placeholder="休日の過ごし方や、どんな会話を楽しみたいかを書いてみましょう"
+          />
+
+          <TouchableOpacity
+            style={[
+              styles.primaryButton,
+              !canSubmit && styles.primaryButtonDisabled,
+            ]}
+            onPress={saveProfile}
+            disabled={!canSubmit}
+          >
+            <Text style={styles.primaryButtonText}>
+              {isSaving ? '保存中...' : '登録してはじめる'}
+            </Text>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
 
       <StatusBar style="dark" />
@@ -351,12 +363,22 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
     width: '100%',
-    maxWidth: 560,
-    alignSelf: 'center',
   },
-  formContainer: {
-    padding: 22,
-    paddingBottom: 50,
+  scrollView: {
+    flex: 1,
+    width: '100%',
+  },
+  scrollContent: {
+    flexGrow: 1,
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingTop: 18,
+    paddingBottom: 56,
+  },
+  formCard: {
+    width: '100%',
+    maxWidth: 520,
+    alignSelf: 'center',
   },
   pageTitle: {
     fontSize: 30,
@@ -376,6 +398,11 @@ const styles = StyleSheet.create({
     color: colors.text,
     marginBottom: 8,
     marginTop: 18,
+  },
+  noticeText: {
+    fontSize: 12,
+    color: colors.subText,
+    marginTop: 8,
   },
   photoPicker: {
     backgroundColor: colors.card,
@@ -461,8 +488,10 @@ const styles = StyleSheet.create({
   birthdayRow: {
     flexDirection: 'row',
     gap: 8,
+    zIndex: 50,
   },
   dropdownWrapper: {
+    flex: 1,
     position: 'relative',
     zIndex: 20,
   },
@@ -476,8 +505,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    gap: 6,
   },
   dropdownText: {
+    flex: 1,
     fontSize: 15,
     fontWeight: '700',
     color: colors.text,
