@@ -74,10 +74,7 @@ export function MatchListScreen({ onSelectUser }: Props) {
     let age = today.getFullYear() - birthday.getFullYear();
     const monthDiff = today.getMonth() - birthday.getMonth();
 
-    if (
-      monthDiff < 0 ||
-      (monthDiff === 0 && today.getDate() < birthday.getDate())
-    ) {
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthday.getDate())) {
       age -= 1;
     }
 
@@ -96,11 +93,7 @@ export function MatchListScreen({ onSelectUser }: Props) {
       id: profile.id,
       name: profile.nickname || '未設定',
       gender: profile.gender || '未設定',
-      age: calculateAge(
-        profile.birth_year,
-        profile.birth_month,
-        profile.birth_day
-      ),
+      age: calculateAge(profile.birth_year, profile.birth_month, profile.birth_day),
       prefecture: profile.prefecture || '未設定',
       profile: profile.profile || '自己紹介はまだありません。',
       photoUrl: photoUrls[0] || null,
@@ -381,17 +374,21 @@ export function MatchListScreen({ onSelectUser }: Props) {
         {isFilterOpen && (
           <View style={styles.filterBody}>
             <Text style={styles.filterLabel}>年齢</Text>
+
             <View style={styles.ageRow}>
               <View style={styles.ageDropdownBox}>
                 {renderDropdown('minAge', minAge, '最小', AGE_OPTIONS, setMinAge, 170)}
               </View>
+
               <Text style={styles.ageSeparator}>〜</Text>
+
               <View style={styles.ageDropdownBox}>
                 {renderDropdown('maxAge', maxAge, '最大', AGE_OPTIONS, setMaxAge, 170)}
               </View>
             </View>
 
             <Text style={styles.filterLabel}>都道府県</Text>
+
             {renderDropdown(
               'prefecture',
               prefectureFilter,
@@ -430,23 +427,29 @@ export function MatchListScreen({ onSelectUser }: Props) {
               activeOpacity={0.9}
               onPress={() => onSelectUser(user)}
             >
-              {user.photoUrl ? (
-                <Image source={{ uri: user.photoUrl }} style={styles.avatarImage} />
-              ) : (
-                <View style={styles.avatar}>
-                  <Text style={styles.avatarIcon}>👤</Text>
+              <View style={styles.cardHeader}>
+                {user.photoUrl ? (
+                  <Image source={{ uri: user.photoUrl }} style={styles.avatarImage} />
+                ) : (
+                  <View style={styles.avatar}>
+                    <Text style={styles.avatarIcon}>👤</Text>
+                  </View>
+                )}
+
+                <View style={styles.cardInfo}>
+                  <Text style={styles.name} numberOfLines={1}>
+                    {user.name} / {user.age ? `${user.age}` : '年齢未設定'}
+                  </Text>
+
+                  <Text style={styles.prefecture} numberOfLines={1}>
+                    {user.gender} / {user.prefecture}
+                  </Text>
+
+                  <Text style={styles.profile} numberOfLines={2}>
+                    {user.profile}
+                  </Text>
                 </View>
-              )}
-
-              <Text style={styles.name}>
-                {user.name} / {user.age ? `${user.age}` : '年齢未設定'}
-              </Text>
-
-              <Text style={styles.prefecture}>
-                {user.gender} / {user.prefecture}
-              </Text>
-
-              <Text style={styles.profile}>{user.profile}</Text>
+              </View>
 
               <TouchableOpacity
                 style={[
@@ -667,63 +670,65 @@ const styles = StyleSheet.create({
   },
   card: {
     backgroundColor: colors.card,
-    borderRadius: 24,
-    padding: 22,
-    marginBottom: 16,
+    borderRadius: 20,
+    padding: 14,
+    marginBottom: 12,
     borderWidth: 1,
     borderColor: colors.border,
   },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  cardInfo: {
+    flex: 1,
+  },
   avatar: {
-    width: 84,
-    height: 84,
-    borderRadius: 42,
+    width: 58,
+    height: 58,
+    borderRadius: 29,
     backgroundColor: colors.accent,
     justifyContent: 'center',
     alignItems: 'center',
-    alignSelf: 'center',
-    marginBottom: 14,
   },
   avatarImage: {
-    width: 84,
-    height: 84,
-    borderRadius: 42,
-    alignSelf: 'center',
-    marginBottom: 14,
+    width: 58,
+    height: 58,
+    borderRadius: 29,
   },
   avatarIcon: {
-    fontSize: 38,
+    fontSize: 28,
   },
   name: {
-    fontSize: 20,
+    fontSize: 17,
     fontWeight: '800',
     color: colors.text,
-    textAlign: 'center',
-    marginBottom: 8,
+    marginBottom: 4,
   },
   prefecture: {
-    fontSize: 14,
+    fontSize: 13,
     color: colors.subText,
-    textAlign: 'center',
-    marginBottom: 12,
+    marginBottom: 5,
   },
   profile: {
-    fontSize: 14,
+    fontSize: 13,
     color: colors.text,
-    lineHeight: 22,
-    marginBottom: 18,
+    lineHeight: 18,
   },
   likeButton: {
     backgroundColor: colors.primary,
-    borderRadius: 16,
-    paddingVertical: 13,
+    borderRadius: 14,
+    paddingVertical: 10,
     alignItems: 'center',
+    marginTop: 12,
   },
   likeButtonLiked: {
     backgroundColor: colors.likedGray,
   },
   likeText: {
     color: '#fff',
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '800',
   },
 });
