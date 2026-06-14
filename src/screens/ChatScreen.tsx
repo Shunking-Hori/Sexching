@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   SafeAreaView,
   StyleSheet,
@@ -9,52 +9,98 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
+  Alert,
 } from 'react-native';
-import type { User } from '../../App';
 import { supabase } from '../lib/supabase';
 
 type Props = {
-  user: User;
+  partnerId: string;
+  partnerName: string;
   onBack: () => void;
 };
 
 type Message = {
-  id: string;
+  id: number;
   sender_id: string;
   receiver_id: string;
-  content: string;
+  message: string;
   created_at: string;
   is_read: boolean;
 };
 
-export function ChatScreen({ user, onBack }: Props) {
+export function ChatScreen({ partnerId, partnerName, onBack }: Props) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [text, setText] = useState('');
-  const [myUserId, setMyUserId] = useState<string | null>(null);
+  const [myId, setMyId] = useState('');
   const [isSending, setIsSending] = useState(false);
 
+  const scrollRef = useRef<ScrollView | null>(null);
+
   useEffect(() => {
-    initialize();
+    initializeChat();
+
+    const channel = supabase
+      .channel(`messages-${partnerId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'messages',
+        },
+        async () => {
+          await loadMessages();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
-  const initialize = async () => {
+  const initializeChat = async () => {
     const {
-      data: { user: currentUser },
+      data: { user },
     } = await supabase.auth.getUser();
 
-    if (!currentUser) return;
+    if (!user) return;
 
-    setMyUserId(currentUser.id);
-    await loadMessages(currentUser.id);
-    await markMessagesAsRead(currentUser.id);
+    setMyId(user.id);
+
+    await markMessagesAsRead(user.id);
+    await loadMessages();
   };
 
-  const loadMessages = async (currentUserId: string) => {
+  const markMessagesAsRead = async (userId: string) => {
+    const { error } = await supabase
+      .from('messages')
+      .update({ is_read: true })
+      .eq('sender_id', partnerId)
+      .eq('receiver_id', userId)
+      .eq('is_read', false);
+
+    if (error) {
+      console.log('既読更新エラー:', error.message);
+    }
+  };
+
+  const loadMessages = async () => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) return;
+
+    setMyId(user.id);
+
+    await markMessagesAsRead(user.id);
+
     const { data, error } = await supabase
       .from('messages')
-      .select('*')
+      .select('id, sender_id, receiver_id, message, created_at, is_read')
       .or(
-        `and(sender_id.eq.${currentUserId},receiver_id.eq.${user.id}),and(sender_id.eq.${user.id},receiver_id.eq.${currentUserId})`
+        `and(sender_id.eq.${user.id},receiver_id.eq.${partnerId}),and(sender_id.eq.${partnerId},receiver_id.eq.${user.id})`
       )
       .order('created_at', { ascending: true });
 
@@ -64,26 +110,77 @@ export function ChatScreen({ user, onBack }: Props) {
     }
 
     setMessages(data || []);
+
+    setTimeout(() => {
+      scrollRef.current?.scrollToEnd({ animated: true });
+    }, 100);
   };
 
-  const markMessagesAsRead = async (currentUserId: string) => {
+  const handleBack = async () => {
+    if (myId) {
+      await markMessagesAsRead(myId);
+    }
+
+    onBack();
+  };
+
+
+  const confirmBlock = (): Promise<boolean> => {
+    if (Platform.OS === 'web') {
+      const webConfirm = (globalThis as unknown as { confirm?: (message: string) => boolean }).confirm;
+      return Promise.resolve(
+        typeof webConfirm === 'function'
+          ? webConfirm(`${partnerName}さんをブロックしますか？`)
+          : true
+      );
+    }
+
+    return new Promise((resolve) => {
+      Alert.alert('ブロック', `${partnerName}さんをブロックしますか？`, [
+        { text: 'キャンセル', style: 'cancel', onPress: () => resolve(false) },
+        { text: 'ブロック', style: 'destructive', onPress: () => resolve(true) },
+      ]);
+    });
+  };
+
+  const blockUser = async () => {
+    if (!myId) {
+      alert('ログイン情報を取得できませんでした。');
+      return;
+    }
+
+    const shouldBlock = await confirmBlock();
+    if (!shouldBlock) return;
+
+    const { error } = await supabase.from('blocks').insert({
+      from_user: myId,
+      to_user: partnerId,
+    });
+
+    if (error && error.code !== '23505') {
+      alert(error.message);
+      return;
+    }
+
     await supabase
-      .from('messages')
-      .update({ is_read: true })
-      .eq('sender_id', user.id)
-      .eq('receiver_id', currentUserId)
-      .eq('is_read', false);
+      .from('likes')
+      .update({ is_match: false, status: 'blocked' })
+      .or(
+        `and(from_user.eq.${myId},to_user.eq.${partnerId}),and(from_user.eq.${partnerId},to_user.eq.${myId})`
+      );
+
+    onBack();
   };
 
   const sendMessage = async () => {
-    if (!myUserId || !text.trim() || isSending) return;
+    if (!text.trim() || !myId || isSending) return;
 
     setIsSending(true);
 
     const { error } = await supabase.from('messages').insert({
-      sender_id: myUserId,
-      receiver_id: user.id,
-      content: text.trim(),
+      sender_id: myId,
+      receiver_id: partnerId,
+      message: text.trim(),
       is_read: false,
     });
 
@@ -95,133 +192,106 @@ export function ChatScreen({ user, onBack }: Props) {
     }
 
     setText('');
-    await loadMessages(myUserId);
-  };
-
-  const blockUser = async () => {
-    if (!myUserId) return;
-
-    const { error } = await supabase.from('blocks').insert({
-      from_user: myUserId,
-      to_user: user.id,
-    });
-
-    if (error) {
-      alert(error.message);
-      return;
-    }
-
-    onBack();
-  };
-
-  const formatTime = (value: string) => {
-    const date = new Date(value);
-    return date.toLocaleTimeString('ja-JP', {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
   };
 
   return (
     <SafeAreaView style={styles.container}>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={handleBack}>
+          <Text style={styles.backText}>← 戻る</Text>
+        </TouchableOpacity>
+
+        <View style={styles.headerTitleRow}>
+          <Text style={styles.headerTitle}>{partnerName}</Text>
+
+          <TouchableOpacity style={styles.blockButton} onPress={blockUser}>
+            <Text style={styles.blockButtonText}>ブロック</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
       <KeyboardAvoidingView
-        style={styles.keyboardArea}
+        style={styles.chatArea}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <View style={styles.content}>
-          <View style={styles.header}>
-            <TouchableOpacity onPress={onBack}>
-              <Text style={styles.backText}>← 戻る</Text>
-            </TouchableOpacity>
+        <ScrollView
+          ref={scrollRef}
+          style={styles.messageList}
+          contentContainerStyle={styles.messageListContent}
+        >
+          {messages.length === 0 && (
+            <View style={styles.emptyBox}>
+              <Text style={styles.emptyText}>まだメッセージはありません。</Text>
+            </View>
+          )}
 
-            <TouchableOpacity style={styles.blockButton} onPress={blockUser}>
-              <Text style={styles.blockButtonText}>ブロック</Text>
-            </TouchableOpacity>
-          </View>
+          {messages.map((message) => {
+            const isMine = message.sender_id === myId;
 
-          <Text style={styles.title}>{user.name}</Text>
-
-          <View style={styles.chatCard}>
-            <ScrollView
-              style={styles.messagesArea}
-              contentContainerStyle={styles.messagesContent}
-              showsVerticalScrollIndicator={false}
-            >
-              {messages.length === 0 ? (
-                <View style={styles.emptyBox}>
-                  <Text style={styles.emptyText}>
-                    まだメッセージはありません。
+            return (
+              <View
+                key={message.id}
+                style={[
+                  styles.messageBlock,
+                  isMine ? styles.myMessageBlock : styles.partnerMessageBlock,
+                ]}
+              >
+                <View
+                  style={[
+                    styles.messageBubble,
+                    isMine ? styles.myMessage : styles.partnerMessage,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.messageText,
+                      isMine ? styles.myMessageText : styles.partnerMessageText,
+                    ]}
+                  >
+                    {message.message}
                   </Text>
-                  <Text style={styles.emptySubText}>
-                    最初のひとことを送ってみましょう。
+
+                  <Text
+                    style={[
+                      styles.messageTime,
+                      isMine ? styles.myMessageTime : styles.partnerMessageTime,
+                    ]}
+                  >
+                    {new Date(message.created_at).toLocaleTimeString()}
                   </Text>
                 </View>
-              ) : (
-                messages.map((message) => {
-                  const isMine = message.sender_id === myUserId;
 
-                  return (
-                    <View
-                      key={message.id}
-                      style={[
-                        styles.messageRow,
-                        isMine ? styles.messageRowMine : styles.messageRowOther,
-                      ]}
-                    >
-                      <View
-                        style={[
-                          styles.messageBubble,
-                          isMine ? styles.myBubble : styles.otherBubble,
-                        ]}
-                      >
-                        <Text
-                          style={[
-                            styles.messageText,
-                            isMine ? styles.myMessageText : styles.otherMessageText,
-                          ]}
-                        >
-                          {message.content}
-                        </Text>
+                {isMine && (
+                  <Text style={styles.readStatus}>
+                    {message.is_read ? '既読' : '未読'}
+                  </Text>
+                )}
+              </View>
+            );
+          })}
+        </ScrollView>
 
-                        <Text
-                          style={[
-                            styles.timeText,
-                            isMine ? styles.myTimeText : styles.otherTimeText,
-                          ]}
-                        >
-                          {formatTime(message.created_at)}
-                          {isMine && message.is_read ? '　既読' : ''}
-                        </Text>
-                      </View>
-                    </View>
-                  );
-                })
-              )}
-            </ScrollView>
+        <View style={styles.inputArea}>
+          <TextInput
+            style={styles.input}
+            value={text}
+            onChangeText={setText}
+            placeholder="メッセージを入力"
+            multiline
+          />
 
-            <View style={styles.inputArea}>
-              <TextInput
-                style={styles.input}
-                value={text}
-                onChangeText={setText}
-                placeholder="メッセージを入力"
-                multiline
-              />
-
-              <TouchableOpacity
-                style={[
-                  styles.sendButton,
-                  (!text.trim() || isSending) && styles.sendButtonDisabled,
-                ]}
-                onPress={sendMessage}
-                disabled={!text.trim() || isSending}
-              >
-                <Text style={styles.sendButtonText}>
-                  {isSending ? '送信中' : '送信'}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
+          <TouchableOpacity
+            style={[
+              styles.sendButton,
+              (!text.trim() || isSending) && styles.sendButtonDisabled,
+            ]}
+            onPress={sendMessage}
+            disabled={!text.trim() || isSending}
+          >
+            <Text style={styles.sendButtonText}>
+              {isSending ? '送信中' : '送信'}
+            </Text>
+          </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -232,11 +302,11 @@ const colors = {
   background: '#fff7f5',
   card: '#ffffff',
   primary: '#8f2d56',
-  accent: '#f4d4dc',
+  disabled: '#c9c1c4',
   text: '#2b2226',
   subText: '#75666c',
   border: '#ead9de',
-  disabled: '#c9c1c4',
+  partnerBubble: '#ffffff',
 };
 
 const styles = StyleSheet.create({
@@ -244,156 +314,139 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
     width: '100%',
-  },
-  keyboardArea: {
-    flex: 1,
-  },
-  content: {
-    flex: 1,
-    width: '100%',
-    maxWidth: 520,
+    maxWidth: 560,
     alignSelf: 'center',
-    paddingHorizontal: 16,
-    paddingTop: 18,
-    paddingBottom: 16,
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 14,
+    backgroundColor: colors.card,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    paddingHorizontal: 20,
+    paddingVertical: 14,
   },
   backText: {
     color: colors.primary,
-    fontSize: 15,
     fontWeight: '800',
+    marginBottom: 6,
+  },
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: colors.text,
+  },
+
+  headerTitleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   blockButton: {
     borderWidth: 1,
     borderColor: colors.primary,
     borderRadius: 999,
-    paddingHorizontal: 14,
+    paddingHorizontal: 12,
     paddingVertical: 7,
-    backgroundColor: colors.card,
   },
   blockButtonText: {
     color: colors.primary,
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '800',
   },
-  title: {
-    fontSize: 26,
-    fontWeight: '800',
-    color: colors.text,
-    marginBottom: 14,
-  },
-  chatCard: {
+  chatArea: {
     flex: 1,
-    backgroundColor: colors.card,
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: colors.border,
-    overflow: 'hidden',
   },
-  messagesArea: {
+  messageList: {
     flex: 1,
-    backgroundColor: colors.background,
   },
-  messagesContent: {
-    padding: 16,
-    paddingBottom: 24,
+  messageListContent: {
+    padding: 20,
   },
   emptyBox: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 80,
+    backgroundColor: colors.card,
+    borderRadius: 20,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   emptyText: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: colors.text,
-    marginBottom: 8,
-  },
-  emptySubText: {
-    fontSize: 13,
     color: colors.subText,
+    textAlign: 'center',
   },
-  messageRow: {
-    width: '100%',
+  messageBlock: {
     marginBottom: 12,
   },
-  messageRowMine: {
+  myMessageBlock: {
+    alignSelf: 'flex-end',
     alignItems: 'flex-end',
   },
-  messageRowOther: {
+  partnerMessageBlock: {
+    alignSelf: 'flex-start',
     alignItems: 'flex-start',
   },
   messageBubble: {
-    maxWidth: '78%',
+    maxWidth: '72%',
+    minWidth: 120,
     borderRadius: 18,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    padding: 12,
   },
-  myBubble: {
+  myMessage: {
     backgroundColor: colors.primary,
-    borderBottomRightRadius: 6,
   },
-  otherBubble: {
-    backgroundColor: colors.card,
+  partnerMessage: {
+    backgroundColor: colors.partnerBubble,
     borderWidth: 1,
     borderColor: colors.border,
-    borderBottomLeftRadius: 6,
   },
   messageText: {
     fontSize: 15,
     lineHeight: 22,
-    fontWeight: '600',
+    flexShrink: 1,
   },
   myMessageText: {
-    color: '#ffffff',
+    color: '#fff',
   },
-  otherMessageText: {
+  partnerMessageText: {
     color: colors.text,
   },
-  timeText: {
+  messageTime: {
     fontSize: 10,
-    marginTop: 5,
+    marginTop: 6,
     textAlign: 'right',
   },
-  myTimeText: {
-    color: '#f8e7ee',
+  myMessageTime: {
+    color: '#f7e6ef',
   },
-  otherTimeText: {
+  partnerMessageTime: {
     color: colors.subText,
+  },
+  readStatus: {
+    fontSize: 11,
+    color: colors.subText,
+    marginTop: 4,
+    marginRight: 4,
   },
   inputArea: {
     flexDirection: 'row',
     gap: 10,
-    padding: 12,
+    padding: 14,
+    backgroundColor: colors.card,
     borderTopWidth: 1,
     borderTopColor: colors.border,
-    backgroundColor: colors.card,
-    alignItems: 'flex-end',
   },
   input: {
     flex: 1,
-    minHeight: 52,
-    maxHeight: 110,
+    backgroundColor: colors.background,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: 18,
+    borderRadius: 16,
     paddingHorizontal: 14,
-    paddingVertical: 13,
-    fontSize: 15,
-    backgroundColor: colors.background,
-    color: colors.text,
-    textAlignVertical: 'top',
+    paddingVertical: 10,
+    maxHeight: 90,
   },
   sendButton: {
-    width: 64,
-    minHeight: 52,
-    borderRadius: 18,
     backgroundColor: colors.primary,
+    borderRadius: 16,
+    paddingHorizontal: 18,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -402,7 +455,6 @@ const styles = StyleSheet.create({
   },
   sendButtonText: {
     color: '#fff',
-    fontSize: 14,
     fontWeight: '800',
   },
 });
