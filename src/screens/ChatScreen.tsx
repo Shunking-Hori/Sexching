@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   SafeAreaView,
   StyleSheet,
@@ -7,100 +7,53 @@ import {
   TextInput,
   TouchableOpacity,
   ScrollView,
-  KeyboardAvoidingView,
-  Platform,
-  Alert,
 } from 'react-native';
+import type { User } from '../../App';
 import { supabase } from '../lib/supabase';
 
 type Props = {
-  partnerId: string;
-  partnerName: string;
+  user: User;
   onBack: () => void;
 };
 
 type Message = {
-  id: number;
+  id: string;
   sender_id: string;
   receiver_id: string;
-  message: string;
+  content: string;
   created_at: string;
   is_read: boolean;
 };
 
-export function ChatScreen({ partnerId, partnerName, onBack }: Props) {
+export function ChatScreen({ user, onBack }: Props) {
   const [messages, setMessages] = useState<Message[]>([]);
-  const [text, setText] = useState('');
-  const [myId, setMyId] = useState('');
-  const [isSending, setIsSending] = useState(false);
-
-  const scrollRef = useRef<ScrollView | null>(null);
+  const [messageText, setMessageText] = useState('');
+  const [myUserId, setMyUserId] = useState<string | null>(null);
 
   useEffect(() => {
-    initializeChat();
+    loadMessages();
 
-    const channel = supabase
-      .channel(`messages-${partnerId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'messages',
-        },
-        async () => {
-          await loadMessages();
-        }
-      )
-      .subscribe();
+    const interval = setInterval(() => {
+      loadMessages();
+    }, 3000);
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => clearInterval(interval);
   }, []);
-
-  const initializeChat = async () => {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) return;
-
-    setMyId(user.id);
-
-    await markMessagesAsRead(user.id);
-    await loadMessages();
-  };
-
-  const markMessagesAsRead = async (userId: string) => {
-    const { error } = await supabase
-      .from('messages')
-      .update({ is_read: true })
-      .eq('sender_id', partnerId)
-      .eq('receiver_id', userId)
-      .eq('is_read', false);
-
-    if (error) {
-      console.log('既読更新エラー:', error.message);
-    }
-  };
 
   const loadMessages = async () => {
     const {
-      data: { user },
+      data: { user: currentUser },
     } = await supabase.auth.getUser();
 
-    if (!user) return;
+    if (!currentUser) return;
 
-    setMyId(user.id);
-
-    await markMessagesAsRead(user.id);
+    setMyUserId(currentUser.id);
 
     const { data, error } = await supabase
       .from('messages')
-      .select('id, sender_id, receiver_id, message, created_at, is_read')
+      .select('*')
       .or(
-        `and(sender_id.eq.${user.id},receiver_id.eq.${partnerId}),and(sender_id.eq.${partnerId},receiver_id.eq.${user.id})`
+        `and(sender_id.eq.${currentUser.id},receiver_id.eq.${user.id}),and(sender_id.eq.${user.id},receiver_id.eq.${currentUser.id})`
       )
       .order('created_at', { ascending: true });
 
@@ -111,189 +64,149 @@ export function ChatScreen({ partnerId, partnerName, onBack }: Props) {
 
     setMessages(data || []);
 
-    setTimeout(() => {
-      scrollRef.current?.scrollToEnd({ animated: true });
-    }, 100);
-  };
-
-  const handleBack = async () => {
-    if (myId) {
-      await markMessagesAsRead(myId);
-    }
-
-    onBack();
-  };
-
-
-  const confirmBlock = (): Promise<boolean> => {
-    if (Platform.OS === 'web') {
-      const webConfirm = (globalThis as unknown as { confirm?: (message: string) => boolean }).confirm;
-      return Promise.resolve(
-        typeof webConfirm === 'function'
-          ? webConfirm(`${partnerName}さんをブロックしますか？`)
-          : true
-      );
-    }
-
-    return new Promise((resolve) => {
-      Alert.alert('ブロック', `${partnerName}さんをブロックしますか？`, [
-        { text: 'キャンセル', style: 'cancel', onPress: () => resolve(false) },
-        { text: 'ブロック', style: 'destructive', onPress: () => resolve(true) },
-      ]);
-    });
-  };
-
-  const blockUser = async () => {
-    if (!myId) {
-      alert('ログイン情報を取得できませんでした。');
-      return;
-    }
-
-    const shouldBlock = await confirmBlock();
-    if (!shouldBlock) return;
-
-    const { error } = await supabase.from('blocks').insert({
-      from_user: myId,
-      to_user: partnerId,
-    });
-
-    if (error && error.code !== '23505') {
-      alert(error.message);
-      return;
-    }
-
     await supabase
-      .from('likes')
-      .update({ is_match: false, status: 'blocked' })
-      .or(
-        `and(from_user.eq.${myId},to_user.eq.${partnerId}),and(from_user.eq.${partnerId},to_user.eq.${myId})`
-      );
-
-    onBack();
+      .from('messages')
+      .update({ is_read: true })
+      .eq('sender_id', user.id)
+      .eq('receiver_id', currentUser.id)
+      .eq('is_read', false);
   };
 
   const sendMessage = async () => {
-    if (!text.trim() || !myId || isSending) return;
-
-    setIsSending(true);
+    if (!myUserId || !messageText.trim()) return;
 
     const { error } = await supabase.from('messages').insert({
-      sender_id: myId,
-      receiver_id: partnerId,
-      message: text.trim(),
+      sender_id: myUserId,
+      receiver_id: user.id,
+      content: messageText.trim(),
       is_read: false,
     });
-
-    setIsSending(false);
 
     if (error) {
       alert(error.message);
       return;
     }
 
-    setText('');
+    setMessageText('');
+    loadMessages();
+  };
+
+  const blockUser = async () => {
+    if (!myUserId) return;
+
+    const { error } = await supabase.from('blocks').insert({
+      from_user: myUserId,
+      to_user: user.id,
+    });
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    alert('ブロックしました。');
+    onBack();
+  };
+
+  const formatTime = (dateText: string) => {
+    const date = new Date(dateText);
+    return date.toLocaleTimeString('ja-JP', {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={handleBack}>
-          <Text style={styles.backText}>← 戻る</Text>
-        </TouchableOpacity>
-
-        <View style={styles.headerTitleRow}>
-          <Text style={styles.headerTitle}>{partnerName}</Text>
+      <View style={styles.screen}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={onBack}>
+            <Text style={styles.backText}>← 戻る</Text>
+          </TouchableOpacity>
 
           <TouchableOpacity style={styles.blockButton} onPress={blockUser}>
             <Text style={styles.blockButtonText}>ブロック</Text>
           </TouchableOpacity>
         </View>
-      </View>
 
-      <KeyboardAvoidingView
-        style={styles.chatArea}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        <ScrollView
-          ref={scrollRef}
-          style={styles.messageList}
-          contentContainerStyle={styles.messageListContent}
-        >
-          {messages.length === 0 && (
-            <View style={styles.emptyBox}>
-              <Text style={styles.emptyText}>まだメッセージはありません。</Text>
-            </View>
-          )}
+        <Text style={styles.title}>{user.name}</Text>
 
-          {messages.map((message) => {
-            const isMine = message.sender_id === myId;
-
-            return (
-              <View
-                key={message.id}
-                style={[
-                  styles.messageBlock,
-                  isMine ? styles.myMessageBlock : styles.partnerMessageBlock,
-                ]}
-              >
-                <View
-                  style={[
-                    styles.messageBubble,
-                    isMine ? styles.myMessage : styles.partnerMessage,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.messageText,
-                      isMine ? styles.myMessageText : styles.partnerMessageText,
-                    ]}
-                  >
-                    {message.message}
-                  </Text>
-
-                  <Text
-                    style={[
-                      styles.messageTime,
-                      isMine ? styles.myMessageTime : styles.partnerMessageTime,
-                    ]}
-                  >
-                    {new Date(message.created_at).toLocaleTimeString()}
-                  </Text>
-                </View>
-
-                {isMine && (
-                  <Text style={styles.readStatus}>
-                    {message.is_read ? '既読' : '未読'}
-                  </Text>
-                )}
-              </View>
-            );
-          })}
-        </ScrollView>
-
-        <View style={styles.inputArea}>
-          <TextInput
-            style={styles.input}
-            value={text}
-            onChangeText={setText}
-            placeholder="メッセージを入力"
-            multiline
-          />
-
-          <TouchableOpacity
-            style={[
-              styles.sendButton,
-              (!text.trim() || isSending) && styles.sendButtonDisabled,
-            ]}
-            onPress={sendMessage}
-            disabled={!text.trim() || isSending}
+        <View style={styles.chatArea}>
+          <ScrollView
+            style={styles.messageList}
+            contentContainerStyle={styles.messageListContent}
+            showsVerticalScrollIndicator={false}
           >
-            <Text style={styles.sendButtonText}>
-              {isSending ? '送信中' : '送信'}
-            </Text>
-          </TouchableOpacity>
+            {messages.length === 0 ? (
+              <View style={styles.emptyArea}>
+                <Text style={styles.emptyText}>まだメッセージはありません</Text>
+                <Text style={styles.emptySubText}>最初のメッセージを送ってみましょう</Text>
+              </View>
+            ) : (
+              messages.map((message) => {
+                const isMine = message.sender_id === myUserId;
+
+                return (
+                  <View
+                    key={message.id}
+                    style={[
+                      styles.messageRow,
+                      isMine ? styles.myMessageRow : styles.otherMessageRow,
+                    ]}
+                  >
+                    <View
+                      style={[
+                        styles.messageBubble,
+                        isMine ? styles.myBubble : styles.otherBubble,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.messageText,
+                          isMine ? styles.myMessageText : styles.otherMessageText,
+                        ]}
+                      >
+                        {message.content}
+                      </Text>
+
+                      <Text
+                        style={[
+                          styles.timeText,
+                          isMine ? styles.myTimeText : styles.otherTimeText,
+                        ]}
+                      >
+                        {formatTime(message.created_at)}
+                        {isMine && message.is_read ? '　既読' : ''}
+                      </Text>
+                    </View>
+                  </View>
+                );
+              })
+            )}
+          </ScrollView>
+
+          <View style={styles.inputArea}>
+            <TextInput
+              style={styles.input}
+              value={messageText}
+              onChangeText={setMessageText}
+              placeholder="メッセージを入力"
+              multiline
+            />
+
+            <TouchableOpacity
+              style={[
+                styles.sendButton,
+                !messageText.trim() && styles.sendButtonDisabled,
+              ]}
+              onPress={sendMessage}
+              disabled={!messageText.trim()}
+            >
+              <Text style={styles.sendButtonText}>送信</Text>
+            </TouchableOpacity>
+          </View>
         </View>
-      </KeyboardAvoidingView>
+      </View>
     </SafeAreaView>
   );
 }
@@ -302,11 +215,11 @@ const colors = {
   background: '#fff7f5',
   card: '#ffffff',
   primary: '#8f2d56',
-  disabled: '#c9c1c4',
+  accent: '#f4d4dc',
   text: '#2b2226',
   subText: '#75666c',
   border: '#ead9de',
-  partnerBubble: '#ffffff',
+  disabled: '#c9c1c4',
 };
 
 const styles = StyleSheet.create({
@@ -314,139 +227,153 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
     width: '100%',
+  },
+  screen: {
+    flex: 1,
+    width: '100%',
     maxWidth: 560,
     alignSelf: 'center',
+    paddingHorizontal: 16,
+    paddingTop: 18,
+    paddingBottom: 14,
   },
   header: {
-    backgroundColor: colors.card,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-  },
-  backText: {
-    color: colors.primary,
-    fontWeight: '800',
-    marginBottom: 6,
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: colors.text,
-  },
-
-  headerTitleRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: 12,
+  },
+  backText: {
+    color: colors.primary,
+    fontSize: 15,
+    fontWeight: '800',
   },
   blockButton: {
+    backgroundColor: colors.card,
     borderWidth: 1,
     borderColor: colors.primary,
     borderRadius: 999,
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
     paddingVertical: 7,
   },
   blockButtonText: {
     color: colors.primary,
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '800',
+  },
+  title: {
+    fontSize: 26,
+    fontWeight: '800',
+    color: colors.text,
+    marginBottom: 14,
   },
   chatArea: {
     flex: 1,
+    backgroundColor: colors.card,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: colors.border,
+    overflow: 'hidden',
   },
   messageList: {
     flex: 1,
+    backgroundColor: colors.background,
   },
   messageListContent: {
-    padding: 20,
+    padding: 14,
+    paddingBottom: 24,
   },
-  emptyBox: {
-    backgroundColor: colors.card,
-    borderRadius: 20,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: colors.border,
+  emptyArea: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 80,
   },
   emptyText: {
-    color: colors.subText,
-    textAlign: 'center',
+    fontSize: 16,
+    fontWeight: '800',
+    color: colors.text,
+    marginBottom: 8,
   },
-  messageBlock: {
+  emptySubText: {
+    fontSize: 13,
+    color: colors.subText,
+  },
+  messageRow: {
+    width: '100%',
     marginBottom: 12,
   },
-  myMessageBlock: {
-    alignSelf: 'flex-end',
+  myMessageRow: {
     alignItems: 'flex-end',
   },
-  partnerMessageBlock: {
-    alignSelf: 'flex-start',
+  otherMessageRow: {
     alignItems: 'flex-start',
   },
   messageBubble: {
-    maxWidth: '72%',
-    minWidth: 120,
+    maxWidth: '82%',
     borderRadius: 18,
-    padding: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
   },
-  myMessage: {
+  myBubble: {
     backgroundColor: colors.primary,
+    borderBottomRightRadius: 6,
   },
-  partnerMessage: {
-    backgroundColor: colors.partnerBubble,
+  otherBubble: {
+    backgroundColor: colors.card,
     borderWidth: 1,
     borderColor: colors.border,
+    borderBottomLeftRadius: 6,
   },
   messageText: {
     fontSize: 15,
     lineHeight: 22,
-    flexShrink: 1,
+    fontWeight: '600',
   },
   myMessageText: {
-    color: '#fff',
+    color: '#ffffff',
   },
-  partnerMessageText: {
+  otherMessageText: {
     color: colors.text,
   },
-  messageTime: {
+  timeText: {
     fontSize: 10,
-    marginTop: 6,
+    marginTop: 5,
     textAlign: 'right',
   },
-  myMessageTime: {
-    color: '#f7e6ef',
+  myTimeText: {
+    color: '#f8e7ee',
   },
-  partnerMessageTime: {
+  otherTimeText: {
     color: colors.subText,
-  },
-  readStatus: {
-    fontSize: 11,
-    color: colors.subText,
-    marginTop: 4,
-    marginRight: 4,
   },
   inputArea: {
     flexDirection: 'row',
     gap: 10,
-    padding: 14,
+    padding: 12,
     backgroundColor: colors.card,
     borderTopWidth: 1,
     borderTopColor: colors.border,
+    alignItems: 'flex-end',
   },
   input: {
     flex: 1,
-    backgroundColor: colors.background,
+    minHeight: 50,
+    maxHeight: 110,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: 16,
     paddingHorizontal: 14,
-    paddingVertical: 10,
-    maxHeight: 90,
+    paddingVertical: 12,
+    backgroundColor: colors.background,
+    fontSize: 15,
+    color: colors.text,
+    textAlignVertical: 'top',
   },
   sendButton: {
-    backgroundColor: colors.primary,
+    width: 62,
+    minHeight: 50,
     borderRadius: 16,
-    paddingHorizontal: 18,
+    backgroundColor: colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -455,6 +382,7 @@ const styles = StyleSheet.create({
   },
   sendButtonText: {
     color: '#fff',
+    fontSize: 14,
     fontWeight: '800',
   },
 });
