@@ -13,6 +13,7 @@ import { MyPageScreen } from './MyPageScreen';
 import { ProfileDetailScreen } from './ProfileDetailScreen';
 import { AdminLikesScreen } from './AdminLikesScreen';
 import { AdminInquiriesScreen } from './AdminInquiriesScreen';
+import { AdminDashboardScreen } from './AdminDashboardScreen';
 import { EditProfileScreen } from './EditProfileScreen';
 import { ChatScreen } from './ChatScreen';
 import { LegalScreen } from './LegalScreen';
@@ -21,7 +22,7 @@ import type { User } from '../../App';
 import { supabase } from '../lib/supabase';
 
 type Tab = 'home' | 'likes' | 'matches' | 'mypage' | 'admin';
-type AdminMode = 'likes' | 'inquiries';
+type AdminMode = 'dashboard' | 'likes' | 'inquiries';
 
 type Props = {
   onLogout: () => void;
@@ -29,7 +30,7 @@ type Props = {
 
 export function MainTabScreen({ onLogout }: Props) {
   const [activeTab, setActiveTab] = useState<Tab>('home');
-  const [adminMode, setAdminMode] = useState<AdminMode>('likes');
+  const [adminMode, setAdminMode] = useState<AdminMode>('dashboard');
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
@@ -126,6 +127,15 @@ export function MainTabScreen({ onLogout }: Props) {
     <View style={styles.adminWrapper}>
       <View style={styles.adminSwitchRow}>
         <TouchableOpacity
+          style={[styles.adminSwitchButton, adminMode === 'dashboard' && styles.adminSwitchButtonActive]}
+          onPress={() => setAdminMode('dashboard')}
+        >
+          <Text style={[styles.adminSwitchText, adminMode === 'dashboard' && styles.adminSwitchTextActive]}>
+            ダッシュボード
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
           style={[styles.adminSwitchButton, adminMode === 'likes' && styles.adminSwitchButtonActive]}
           onPress={() => setAdminMode('likes')}
         >
@@ -133,6 +143,7 @@ export function MainTabScreen({ onLogout }: Props) {
             いいね承認
           </Text>
         </TouchableOpacity>
+
         <TouchableOpacity
           style={[styles.adminSwitchButton, adminMode === 'inquiries' && styles.adminSwitchButtonActive]}
           onPress={() => setAdminMode('inquiries')}
@@ -142,8 +153,11 @@ export function MainTabScreen({ onLogout }: Props) {
           </Text>
         </TouchableOpacity>
       </View>
+
       <View style={styles.adminContent}>
-        {adminMode === 'likes' ? <AdminLikesScreen /> : <AdminInquiriesScreen />}
+        {adminMode === 'dashboard' && <AdminDashboardScreen />}
+        {adminMode === 'likes' && <AdminLikesScreen />}
+        {adminMode === 'inquiries' && <AdminInquiriesScreen />}
       </View>
     </View>
   );
@@ -267,11 +281,11 @@ const styles = StyleSheet.create({
   adminSwitchRow: {
     flexDirection: 'row',
     gap: 8,
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
     paddingTop: 12,
     paddingBottom: 8,
     width: '100%',
-    maxWidth: 680,
+    maxWidth: 760,
     alignSelf: 'center',
   },
   adminSwitchButton: {
@@ -289,7 +303,7 @@ const styles = StyleSheet.create({
   },
   adminSwitchText: {
     color: colors.subText,
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '900',
   },
   adminSwitchTextActive: {
