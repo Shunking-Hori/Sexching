@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   SafeAreaView,
   StyleSheet,
@@ -7,6 +7,8 @@ import {
   TextInput,
   TouchableOpacity,
   ScrollView,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import type { User } from '../../App';
 import { supabase } from '../lib/supabase';
@@ -29,13 +31,19 @@ export function ChatScreen({ user, onBack }: Props) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [messageText, setMessageText] = useState('');
   const [myUserId, setMyUserId] = useState<string | null>(null);
+  const scrollRef = useRef<ScrollView>(null);
 
   useEffect(() => {
     loadMessages();
-
     const interval = setInterval(loadMessages, 3000);
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    setTimeout(() => {
+      scrollRef.current?.scrollToEnd({ animated: true });
+    }, 100);
+  }, [messages]);
 
   const loadMessages = async () => {
     const {
@@ -115,97 +123,108 @@ export function ChatScreen({ user, onBack }: Props) {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.screen}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={onBack}>
-            <Text style={styles.backText}>← 戻る</Text>
-          </TouchableOpacity>
+      <KeyboardAvoidingView
+        style={styles.keyboardArea}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <View style={styles.screen}>
+          <View style={styles.header}>
+            <TouchableOpacity onPress={onBack}>
+              <Text style={styles.backText}>← 戻る</Text>
+            </TouchableOpacity>
 
-          <TouchableOpacity style={styles.blockButton} onPress={blockUser}>
-            <Text style={styles.blockButtonText}>ブロック</Text>
-          </TouchableOpacity>
-        </View>
+            <Text style={styles.title} numberOfLines={1}>
+              {user.name}
+            </Text>
 
-        <Text style={styles.title}>{user.name}</Text>
-
-        <View style={styles.chatArea}>
-          <ScrollView
-            style={styles.messageList}
-            contentContainerStyle={styles.messageListContent}
-            showsVerticalScrollIndicator={false}
-          >
-            {messages.length === 0 ? (
-              <View style={styles.emptyArea}>
-                <Text style={styles.emptyText}>まだメッセージはありません</Text>
-                <Text style={styles.emptySubText}>最初のメッセージを送ってみましょう</Text>
-              </View>
-            ) : (
-              messages.map((message) => {
-                const isMine = message.sender_id === myUserId;
-
-                return (
-                  <View
-                    key={message.id}
-                    style={[
-                      styles.messageRow,
-                      isMine ? styles.myMessageRow : styles.otherMessageRow,
-                    ]}
-                  >
-                    <View
-                      style={[
-                        styles.messageBubble,
-                        isMine ? styles.myBubble : styles.otherBubble,
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.messageText,
-                          isMine ? styles.myMessageText : styles.otherMessageText,
-                        ]}
-                      >
-                        {message.content}
-                      </Text>
-
-                      <Text
-                        style={[
-                          styles.timeText,
-                          isMine ? styles.myTimeText : styles.otherTimeText,
-                        ]}
-                      >
-                        {formatTime(message.created_at)}
-                        {isMine && message.is_read ? '　既読' : ''}
-                      </Text>
-                    </View>
-                  </View>
-                );
-              })
-            )}
-          </ScrollView>
-
-          <View style={styles.inputArea}>
-            <TextInput
-              style={styles.input}
-              value={messageText}
-              onChangeText={setMessageText}
-              placeholder="メッセージを入力"
-              multiline={false}
-              returnKeyType="send"
-              onSubmitEditing={sendMessage}
-            />
-
-            <TouchableOpacity
-              style={[
-                styles.sendButton,
-                !messageText.trim() && styles.sendButtonDisabled,
-              ]}
-              onPress={sendMessage}
-              disabled={!messageText.trim()}
-            >
-              <Text style={styles.sendButtonText}>送信</Text>
+            <TouchableOpacity style={styles.blockButton} onPress={blockUser}>
+              <Text style={styles.blockButtonText}>ブロック</Text>
             </TouchableOpacity>
           </View>
+
+          <View style={styles.chatArea}>
+            <ScrollView
+              ref={scrollRef}
+              style={styles.messageList}
+              contentContainerStyle={styles.messageListContent}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
+              {messages.length === 0 ? (
+                <View style={styles.emptyArea}>
+                  <Text style={styles.emptyText}>まだメッセージはありません</Text>
+                  <Text style={styles.emptySubText}>
+                    最初のメッセージを送ってみましょう
+                  </Text>
+                </View>
+              ) : (
+                messages.map((message) => {
+                  const isMine = message.sender_id === myUserId;
+
+                  return (
+                    <View
+                      key={message.id}
+                      style={[
+                        styles.messageRow,
+                        isMine ? styles.myMessageRow : styles.otherMessageRow,
+                      ]}
+                    >
+                      <View
+                        style={[
+                          styles.messageBubble,
+                          isMine ? styles.myBubble : styles.otherBubble,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.messageText,
+                            isMine ? styles.myMessageText : styles.otherMessageText,
+                          ]}
+                        >
+                          {message.content}
+                        </Text>
+
+                        <Text
+                          style={[
+                            styles.timeText,
+                            isMine ? styles.myTimeText : styles.otherTimeText,
+                          ]}
+                        >
+                          {formatTime(message.created_at)}
+                          {isMine && message.is_read ? '　既読' : ''}
+                        </Text>
+                      </View>
+                    </View>
+                  );
+                })
+              )}
+            </ScrollView>
+
+            <View style={styles.inputArea}>
+              <TextInput
+                style={styles.input}
+                value={messageText}
+                onChangeText={setMessageText}
+                placeholder="メッセージを入力"
+                multiline={false}
+                returnKeyType="send"
+                onSubmitEditing={sendMessage}
+              />
+
+              <TouchableOpacity
+                style={[
+                  styles.sendButton,
+                  !messageText.trim() && styles.sendButtonDisabled,
+                ]}
+                onPress={sendMessage}
+                disabled={!messageText.trim()}
+              >
+                <Text style={styles.sendButtonText}>送信</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -224,9 +243,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     width: '100%',
-    minHeight: '100%',
+    height: Platform.OS === 'web' ? '100vh' as any : '100%',
     backgroundColor: colors.background,
-    alignItems: 'center',
+  },
+  keyboardArea: {
+    flex: 1,
+    width: '100%',
   },
   screen: {
     flex: 1,
@@ -234,42 +256,43 @@ const styles = StyleSheet.create({
     maxWidth: 520,
     alignSelf: 'center',
     paddingHorizontal: 16,
-    paddingTop: 18,
-    paddingBottom: 12,
+    paddingTop: 14,
+    paddingBottom: 10,
   },
   header: {
+    height: 48,
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 10,
   },
   backText: {
     color: colors.primary,
     fontSize: 15,
     fontWeight: '800',
   },
+  title: {
+    flex: 1,
+    textAlign: 'center',
+    fontSize: 18,
+    fontWeight: '800',
+    color: colors.text,
+    marginHorizontal: 8,
+  },
   blockButton: {
     backgroundColor: colors.card,
     borderWidth: 1,
     borderColor: colors.primary,
     borderRadius: 999,
-    paddingHorizontal: 14,
+    paddingHorizontal: 12,
     paddingVertical: 7,
   },
   blockButtonText: {
     color: colors.primary,
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '800',
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: colors.text,
-    marginBottom: 12,
   },
   chatArea: {
     flex: 1,
-    minHeight: 420,
     backgroundColor: colors.card,
     borderRadius: 22,
     borderWidth: 1,
@@ -287,7 +310,7 @@ const styles = StyleSheet.create({
   emptyArea: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 70,
+    paddingVertical: 80,
   },
   emptyText: {
     fontSize: 16,
