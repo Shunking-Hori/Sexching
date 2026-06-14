@@ -132,9 +132,17 @@ export function ChatScreen({ user, onBack }: Props) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.screen}>
-          <TouchableOpacity onPress={onBack}>
-            <Text style={styles.backText}>← 戻る</Text>
-          </TouchableOpacity>
+          <View style={styles.header}>
+            <TouchableOpacity onPress={onBack}>
+              <Text style={styles.backText}>← 戻る</Text>
+            </TouchableOpacity>
+
+            <Text style={styles.title} numberOfLines={1}>
+              チャット
+            </Text>
+
+            <View style={styles.headerRightSpacer} />
+          </View>
 
           <View style={styles.emptyArea}>
             <Text style={styles.emptyText}>ユーザー情報を取得できませんでした</Text>
@@ -272,32 +280,37 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     width: '100%',
-    height: Platform.OS === 'web' ? ('100vh' as any) : '100%',
+    height: Platform.OS === 'web' ? ('100dvh' as any) : '100%',
     backgroundColor: colors.background,
+    overflow: 'hidden' as any,
   },
   keyboardArea: {
     flex: 1,
     width: '100%',
+    overflow: 'hidden' as any,
   },
   screen: {
     flex: 1,
     width: '100%',
     maxWidth: 520,
     alignSelf: 'center',
-    paddingHorizontal: 16,
-    paddingTop: 14,
-    paddingBottom: 10,
+    paddingHorizontal: 14,
+    paddingTop: Platform.OS === 'web' ? 34 : 14,
+    paddingBottom: 8,
+    overflow: 'hidden' as any,
   },
   header: {
-    height: 48,
+    height: 46,
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 8,
+    flexShrink: 0,
   },
   backText: {
     color: colors.primary,
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '800',
+    width: 72,
   },
   title: {
     flex: 1,
@@ -305,23 +318,28 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '800',
     color: colors.text,
-    marginHorizontal: 8,
   },
   blockButton: {
     backgroundColor: colors.card,
     borderWidth: 1,
     borderColor: colors.primary,
     borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    width: 72,
+    alignItems: 'center',
   },
   blockButtonText: {
     color: colors.primary,
     fontSize: 12,
     fontWeight: '800',
   },
+  headerRightSpacer: {
+    width: 72,
+  },
   chatArea: {
     flex: 1,
+    width: '100%',
     backgroundColor: colors.card,
     borderRadius: 22,
     borderWidth: 1,
@@ -401,15 +419,18 @@ const styles = StyleSheet.create({
   },
   inputArea: {
     flexDirection: 'row',
-    gap: 10,
-    padding: 12,
+    gap: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 10,
     backgroundColor: colors.card,
     borderTopWidth: 1,
     borderTopColor: colors.border,
     alignItems: 'center',
+    flexShrink: 0,
   },
   input: {
     flex: 1,
+    minWidth: 0,
     height: 48,
     borderWidth: 1,
     borderColor: colors.border,
@@ -420,12 +441,13 @@ const styles = StyleSheet.create({
     color: colors.text,
   },
   sendButton: {
-    width: 62,
+    width: 58,
     height: 48,
     borderRadius: 16,
     backgroundColor: colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
+    flexShrink: 0,
   },
   sendButtonDisabled: {
     backgroundColor: colors.disabled,
