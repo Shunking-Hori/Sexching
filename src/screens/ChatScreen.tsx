@@ -227,11 +227,12 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
     width: '100%',
+    alignItems: 'center',
   },
   screen: {
     flex: 1,
     width: '100%',
-    maxWidth: 560,
+    maxWidth: 520,
     alignSelf: 'center',
     paddingHorizontal: 16,
     paddingTop: 18,
