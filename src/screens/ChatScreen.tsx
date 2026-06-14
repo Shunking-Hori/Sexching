@@ -227,6 +227,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
     width: '100%',
+    minWidth: '100%',
     alignItems: 'center',
   },
   screen: {
