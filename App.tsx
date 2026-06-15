@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Analytics } from '@vercel/analytics/react';
 import { HomeScreen } from './src/screens/HomeScreen';
 import { ProfileScreen } from './src/screens/ProfileScreen';
 import { MainTabScreen } from './src/screens/MainTabScreen';
@@ -56,38 +57,47 @@ export default function App() {
     setScreen(data ? 'main' : 'profile');
   };
 
-  if (authLegalType) {
-    return <LegalScreen type={authLegalType} onBack={() => setAuthLegalType(null)} />;
-  }
+  const renderScreen = () => {
+    if (authLegalType) {
+      return <LegalScreen type={authLegalType} onBack={() => setAuthLegalType(null)} />;
+    }
 
-  if (screen === 'auth') {
+    if (screen === 'auth') {
+      return (
+        <AuthScreen
+          initialMode={authInitialMode}
+          onComplete={goAfterLogin}
+          onOpenLegal={setAuthLegalType}
+        />
+      );
+    }
+
+    if (screen === 'profile') {
+      return <ProfileScreen onComplete={() => setScreen('main')} />;
+    }
+
+    if (screen === 'main') {
+      return <MainTabScreen onLogout={() => setScreen('home')} />;
+    }
+
     return (
-      <AuthScreen
-        initialMode={authInitialMode}
-        onComplete={goAfterLogin}
-        onOpenLegal={setAuthLegalType}
+      <HomeScreen
+        onLogin={() => {
+          setAuthInitialMode('login');
+          setScreen('auth');
+        }}
+        onSignup={() => {
+          setAuthInitialMode('signup');
+          setScreen('auth');
+        }}
       />
     );
-  }
-
-  if (screen === 'profile') {
-    return <ProfileScreen onComplete={() => setScreen('main')} />;
-  }
-
-  if (screen === 'main') {
-    return <MainTabScreen onLogout={() => setScreen('home')} />;
-  }
+  };
 
   return (
-    <HomeScreen
-      onLogin={() => {
-        setAuthInitialMode('login');
-        setScreen('auth');
-      }}
-      onSignup={() => {
-        setAuthInitialMode('signup');
-        setScreen('auth');
-      }}
-    />
+    <>
+      {renderScreen()}
+      <Analytics />
+    </>
   );
 }
